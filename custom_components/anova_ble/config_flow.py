@@ -159,7 +159,14 @@ class AnovaConfigFlow(ConfigFlow, domain=DOMAIN):
         self, service_info: BluetoothServiceInfoBleak
     ) -> str | None:
         """Read the cooker once. Return an error key, or None when it works."""
-        client = AnovaClient(service_info.device, disconnect_delay=None)
+        # Prefer the freshest device, it may now be reachable via a closer proxy.
+        ble_device = (
+            bluetooth.async_ble_device_from_address(
+                self.hass, service_info.address, connectable=True
+            )
+            or service_info.device
+        )
+        client = AnovaClient(ble_device, disconnect_delay=None)
         try:
             await client.read_state()
         except AnovaError as err:
