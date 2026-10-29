@@ -1,0 +1,149 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Deze cooker is al ingesteld.",
+      "already_in_progress": "Het instellen van deze cooker is al bezig.",
+      "no_devices_found": "Geen Anova cookers gevonden. Controleer of de cooker is aangesloten en binnen bereik van een Bluetooth adapter of Bluetooth proxy is, en sluit de Anova app op je telefoon.",
+      "not_supported": "Dit apparaat is geen ondersteunde Anova Precision Cooker."
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken met de cooker. Sluit de Anova app op je telefoon, verplaats de cooker dichter bij de Bluetooth adapter of Bluetooth proxy en probeer het opnieuw.",
+      "unknown": "Onverwachte fout. Bekijk de logboeken voor meer details."
+    },
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "description": "Wil je {name} instellen? Sluit eerst de Anova app op je telefoon. De cooker accepteert maar één Bluetooth verbinding tegelijk."
+      },
+      "user": {
+        "data": {
+          "address": "Cooker"
+        },
+        "data_description": {
+          "address": "De Anova cookers die via Bluetooth zijn gevonden."
+        },
+        "description": "Kies de cooker die je wilt instellen. Sluit eerst de Anova app op je telefoon. De cooker accepteert maar één Bluetooth verbinding tegelijk."
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cooking": {
+        "name": "Koken"
+      },
+      "timer_running": {
+        "name": "Timer actief"
+      }
+    },
+    "button": {
+      "start_timer": {
+        "name": "Timer starten"
+      },
+      "stop_timer": {
+        "name": "Timer stoppen"
+      }
+    },
+    "number": {
+      "timer": {
+        "name": "Timer"
+      }
+    },
+    "select": {
+      "temperature_unit": {
+        "name": "Temperatuureenheid",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      }
+    },
+    "sensor": {
+      "current_temperature": {
+        "name": "Huidige temperatuur"
+      },
+      "rssi": {
+        "name": "Signaalsterkte"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "heater_error": "Verwarmingsfout",
+          "low_water": "Laag waterniveau",
+          "power_loss": "Stroomuitval",
+          "running": "In bedrijf",
+          "stopped": "Gestopt",
+          "user_change_parameter": "Gewijzigd op de cooker"
+        }
+      },
+      "target_temperature": {
+        "name": "Doeltemperatuur"
+      },
+      "timer_remaining": {
+        "name": "Resterende timertijd"
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "De cooker heeft de opdracht niet geaccepteerd: {error}"
+    },
+    "device_not_found": {
+      "message": "De Anova cooker met adres {address} is niet gevonden. Controleer of hij is aangesloten en binnen bereik van een Bluetooth adapter of Bluetooth proxy is. {reason}"
+    },
+    "device_out_of_range": {
+      "message": "De Anova cooker {address} is buiten het Bluetooth bereik."
+    },
+    "invalid_value": {
+      "message": "Ongeldige waarde: {error}"
+    },
+    "missing_address": {
+      "message": "Deze integratie heeft geen Bluetooth adres. Verwijder de integratie en voeg de cooker opnieuw toe."
+    },
+    "update_failed": {
+      "message": "Kan de cooker niet uitlezen: {error}"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "connection_mode": "Verbindingsmodus",
+          "poll_interval": "Ophaalinterval"
+        },
+        "data_description": {
+          "connection_mode": "Per meting: Home Assistant verbreekt de verbinding na elke meting, zodat de telefoon app er tussendoor kan verbinden. Daardoor moet er bij elke meting opnieuw verbinding worden gemaakt. Verbonden houden: updates komen sneller binnen, maar de cooker accepteert maar één Bluetooth verbinding. Zolang Home Assistant de verbinding vasthoudt, kan de telefoon app niet verbinden.",
+          "poll_interval": "Hoe vaak Home Assistant de cooker uitleest, in seconden (5 tot 300). Een kort interval kost meer Bluetooth verkeer. Zolang de cooker niet bereikbaar is, wacht Home Assistant langer tussen de metingen."
+        },
+        "description": "Kies hoe Home Assistant met de cooker communiceert. De cooker accepteert maar één Bluetooth verbinding tegelijk."
+      }
+    }
+  },
+  "selector": {
+    "connection_mode": {
+      "options": {
+        "per_poll": "Per meting (telefoon app kan tussen metingen verbinden)",
+        "persistent": "Verbonden houden (blokkeert de telefoon app)"
+      }
+    }
+  },
+  "services": {
+    "start_cook": {
+      "description": "Stelt de doeltemperatuur in, start het verwarmen en start de timer als er een duur is opgegeven.",
+      "fields": {
+        "duration": {
+          "description": "Hoe lang er gekookt moet worden. Wordt naar boven afgerond op hele minuten. Laat leeg om te koken zonder timer.",
+          "name": "Duur"
+        },
+        "temperature": {
+          "description": "Doeltemperatuur van het water, in het eenhedenstelsel van Home Assistant.",
+          "name": "Temperatuur"
+        }
+      },
+      "name": "Koken starten"
+    },
+    "stop_cook": {
+      "description": "Stopt het verwarmen en de timer.",
+      "name": "Koken stoppen"
+    }
+  }
+}

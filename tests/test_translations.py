@@ -39,6 +39,28 @@ def test_english_translation_matches_strings() -> None:
     assert english == STRINGS
 
 
+def _leaves(data: dict, path: tuple[str, ...] = ()) -> dict[tuple[str, ...], str]:
+    """Map every nested key path to its string value."""
+    out: dict[tuple[str, ...], str] = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            out |= _leaves(value, (*path, key))
+        else:
+            out[(*path, key)] = value
+    return out
+
+
+def test_dutch_translation_matches_strings() -> None:
+    """translations/nl.json has the same keys and placeholders as strings.json."""
+    dutch = _leaves(json.loads((INTEGRATION / "translations" / "nl.json").read_text()))
+    english = _leaves(STRINGS)
+
+    assert dutch.keys() == english.keys()
+    for path, text in english.items():
+        placeholders = set(re.findall(r"\{\w+\}", text))
+        assert set(re.findall(r"\{\w+\}", dutch[path])) == placeholders, path
+
+
 @pytest.mark.parametrize(
     ("platform", "key"),
     [(platform, key) for platform, keys in ENTITIES.items() for key in keys],
