@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>anova-cooker-card harness</title>
+<!--
+  Test harness for the Lovelace card. Opened over file:// by tests/frontend/render.mjs.
+  Query params: ?theme=dark   dark palette on the host (documentElement)
+                ?width=320    single column, every card 320px wide
+  The card is loaded as a classic script (module scripts are blocked on file://), the
+  card wraps itself in an IIFE so this works and double loading is harmless.
+-->
+<style>
+  :root {
+    /* light palette, roughly Home Assistant's default theme */
+    --primary-color: #03a9f4;
+    --primary-text-color: #212121;
+    --secondary-text-color: #727272;
+    --text-primary-color: #ffffff;
+    --card-background-color: #ffffff;
+    --secondary-background-color: #e5e5e5;
+    --divider-color: rgba(0, 0, 0, 0.12);
+    --state-active-color: #ffc107;
+    --state-climate-heat-color: #ff5722;
+    --error-color: #db4437;
+    --warning-color: #ffa600;
+    --success-color: #43a047;
+    --ha-card-border-radius: 12px;
+    --page-bg: #f4f4f4;
+  }
+  :root[data-theme="dark"] {
+    --primary-color: #03a9f4;
+    --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b;
+    --text-primary-color: #ffffff;
+    --card-background-color: #1c1c1c;
+    --secondary-background-color: #2b2b2b;
+    --divider-color: rgba(225, 225, 225, 0.14);
+    --state-active-color: #ffc107;
+    --state-climate-heat-color: #ff7043;
+    --error-color: #ef5350;
+    --warning-color: #ffb74d;
+    --success-color: #66bb6a;
+    --page-bg: #111111;
+    color-scheme: dark;
+  }
+  html { background: var(--page-bg); }
+  body { margin: 0; font-family: Roboto, system-ui, sans-serif; color: var(--primary-text-color); }
+  #stage { display: grid; grid-template-columns: repeat(2, 360px); gap: 16px; padding: 16px; width: max-content; }
+  body.narrow #stage { grid-template-columns: 320px; padding: 0; gap: 8px; }
+  #editor-host { padding: 16px; max-width: 360px; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="editor-host"></div>
+
+<script>
+/* ---------- stub elements (only if the real ones are not defined) ---------- */
+// ha-card: background, radius and border like HA's card. Styled inline because document CSS
+// does not reach elements inside the card's shadow root.
+if (!customElements.get("ha-card")) {
+  customElements.define("ha-card", class extends HTMLElement {
+    connectedCallback() {
+      this.style.cssText = "display:block;background:var(--card-background-color);color:var(--primary-text-color);" +
+        "border-radius:var(--ha-card-border-radius,12px);border:1px solid var(--divider-color);" +
+        "box-shadow:0 1px 3px rgba(0,0,0,.18)";
+    }
+  });
+}
+// ha-icon: simple stroke icons keyed by the mdi name the card uses, enough for screenshots.
+const ICONS = {
+  "mdi:plus": '<path d="M12 5v14M5 12h14"/>',
+  "mdi:minus": '<path d="M5 12h14"/>',
+  "mdi:play": '<path d="M7 4.5v15l12-7.5z" fill="currentColor"/>',
+  "mdi:stop": '<rect x="6" y="6" width="12" height="12" rx="1" fill="currentColor"/>',
+  "mdi:fire": '<path d="M12 2.5c.6 3.6 5 5.6 5 10.5a5 5 0 0 1-10 0c0-2 .9-3.2 2-4.2.1 1.8.9 2.7 2 2.9-.4-3.6-.8-6 1-9.2z"/>',
+  "mdi:check-circle-outline": '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+  "mdi:arrow-up": '<path d="M12 19V5M6 11l6-6 6 6"/>',
+  "mdi:timer-outline": '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 1.5M9.5 2.5h5"/>',
+  "mdi:timer-off-outline": '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4M9.5 2.5h5M3.5 3.5l17 17"/>',
+  "mdi:alert-outline": '<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5M12 17.5h.01"/>',
+  "mdi:power": '<path d="M12 3v9M6.3 6.6a8 8 0 1 0 11.4 0"/>',
+  "mdi:bluetooth-off": '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
+};
+if (!customElements.get("ha-icon")) {
+  customElements.define("ha-icon", class extends HTMLElement {
+    static get observedAttributes() { return ["icon"]; }
+    connectedCallback() { this._r(); }
+    attributeChangedCallback() { this._r(); }
+    _r() {
+      const body = ICONS[this.getAttribute("icon")] || '<circle cx="12" cy="12" r="3"/>';
+      // like the real ha-icon: size itself from --mdc-icon-size (set by the card's own CSS)
+      this.style.cssText = "display:inline-flex;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px)";
+      this.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" ` +
+        `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+    }
+  });
+}
+// ha-form: one text input per schema item, emits value-changed like the real one.
+if (!customElements.get("ha-form")) {
+  customElements.define("ha-form", class extends HTMLElement {
+    set schema(v) { this._schema = v; this._r(); }
+    get schema() { return this._schema; }
+    set data(v) { this._data = v; this._r(); }
+    get data() { return this._data; }
+    set computeLabel(v) { this._cl = v; this._r(); }
+    get computeLabel() { return this._cl; }
+    _r() {
+      if (!this._schema || !this._data) return;
+      this.replaceChildren();
+      for (const item of this._schema) {
+        const wrap = document.createElement("label");
+        wrap.style.cssText = "display:block;margin:8px 0";
+        const span = document.createElement("span");
+        span.textContent = (this._cl ? this._cl(item) : item.name) + (item.required ? " *" : "");
+        const input = document.createElement("input");
+        input.name = item.name;
+        input.value = this._data[item.name] ?? "";
+        input.addEventListener("input", () => {
+          this.dispatchEvent(new CustomEvent("value-changed", {
+            detail: { value: { ...this._data, [item.name]: input.value } }, bubbles: true, composed: true,
+          }));
+        });
+        wrap.append(span, document.createElement("br"), input);
+        this.appendChild(wrap);
+      }
+    }
+  });
+}
+
+/* ---------- fake hass ---------- */
+window.__calls = [];      // every callService, in order
+window.__delay = 0;       // ms each callService takes
+window.__fail = null;     // set to a string to make callService reject with {message}
+window.__scn = {};        // name -> {hass, card}
+
+const DEVICE = "dev_anova";
+const mk = (entity_id, state, attributes = {}) => ({
+  entity_id, state, attributes, last_changed: "", last_updated: "", context: { id: "x" },
+});
+const reg = (platform, device_id, translation_key) => ({ platform, device_id, translation_key });
+
+// Fixed set of scenarios; ids are the same in each, every card has its own hass object.
+const SCENARIOS = {
+  // cooking, still heating, timer of 2 h with 65 min left, timer_remaining carries running=true
+  cooking: { climate: "heat", current: 54.2, target: 56.5, cooking: "on", timerSet: 120, remaining: 65, status: "running", running: true },
+  off: { climate: "off", current: 23.4, target: 56.5, cooking: "off", timerSet: 0, remaining: 0, status: "stopped" },
+  offline: { climate: "unavailable" },
+  // at temperature, status warning, no `running` attribute: the card infers it from cooking + time left
+  warning: { climate: "heat", current: 56.4, target: 56.5, cooking: "on", timerSet: 240, remaining: 180, status: "low_water" },
+};
+
+function buildHass(name, s) {
+  const unavailable = s.climate === "unavailable";
+  const sv = (v) => (unavailable ? "unavailable" : String(v));
+  const states = {
+    "climate.anova": mk("climate.anova", s.climate, unavailable ? { friendly_name: "Anova Precision Cooker" } : {
+      friendly_name: "Anova Precision Cooker", current_temperature: s.current, temperature: s.target,
+      min_temp: 5, max_temp: 99.9, target_temp_step: 0.1, hvac_modes: ["off", "heat"],
+      hvac_action: s.cooking === "on" ? "heating" : "off", unit: "°C",
+    }),
+    "number.anova_timer": mk("number.anova_timer", sv(s.timerSet ?? 0), { min: 0, max: 6000, unit_of_measurement: "min" }),
+    "sensor.anova_timer_remaining": mk("sensor.anova_timer_remaining", sv(s.remaining ?? 0),
+      s.running === undefined ? { unit_of_measurement: "min" } : { unit_of_measurement: "min", running: s.running }),
+    "button.anova_start_timer": mk("button.anova_start_timer", unavailable ? "unavailable" : "unknown"),
+    "button.anova_stop_timer": mk("button.anova_stop_timer", unavailable ? "unavailable" : "unknown"),
+    "binary_sensor.anova_cooking": mk("binary_sensor.anova_cooking", unavailable ? "unavailable" : s.cooking),
+    "sensor.anova_status": mk("sensor.anova_status", unavailable ? "unavailable" : s.status),
+    // decoys: another climate from another platform, and anova entities of another device
+    "climate.other": mk("climate.other", "heat", { current_temperature: 1, temperature: 2 }),
+    "button.other_start_timer": mk("button.other_start_timer", "unknown"),
+    "sensor.unrelated": mk("sensor.unrelated", "1"),
+  };
+  const entities = {
+    "climate.other": reg("other_platform", "dev_other", "cooker"),
+    "button.other_start_timer": reg("anova_ble", "dev_two", "start_timer"),
+    "sensor.unrelated": reg("template", DEVICE, "status"),
+    "climate.anova": reg("anova_ble", DEVICE, "cooker"),
+    "number.anova_timer": reg("anova_ble", DEVICE, "timer"),
+    "sensor.anova_timer_remaining": reg("anova_ble", DEVICE, "timer_remaining"),
+    "button.anova_start_timer": reg("anova_ble", DEVICE, "start_timer"),
+    "button.anova_stop_timer": reg("anova_ble", DEVICE, "stop_timer"),
+    "binary_sensor.anova_cooking": reg("anova_ble", DEVICE, "cooking"),
+    "sensor.anova_status": reg("anova_ble", DEVICE, "status"),
+  };
+  const scn = { name, states, entities };
+  scn.hass = {
+    states, entities, language: "en", locale: { language: "en" },
+    config: { unit_system: { temperature: "°C" } },
+    callService: (domain, service, data) => callService(scn, domain, service, data),
+  };
+  return scn;
+}
+
+// Replace states the way HA does: new hass object, new state object for the entity.
+function setState(scn, id, patch) {
+  const old = scn.hass.states[id];
+  const next = { ...old, ...patch, attributes: { ...old.attributes, ...(patch.attributes || {}) } };
+  scn.hass = { ...scn.hass, states: { ...scn.hass.states, [id]: next } };
+  scn.card.hass = scn.hass;
+}
+window.__setState = (name, id, patch) => setState(window.__scn[name], id, patch);
+
+// Minimal simulation of the integration so the card reacts like it would in HA.
+function simulate(scn, domain, service, data) {
+  const C = "climate.anova";
+  if (domain === "climate" && service === "set_temperature") {
+    setState(scn, C, { attributes: { temperature: data.temperature } });
+  } else if (domain === "anova_ble" && service === "start_cook") {
+    const mins = data.duration ? data.duration.hours * 60 + data.duration.minutes : 0;
+    setState(scn, C, { state: "heat", attributes: { temperature: data.temperature } });
+    setState(scn, "binary_sensor.anova_cooking", { state: "on" });
+    setState(scn, "number.anova_timer", { state: String(mins) });
+    setState(scn, "sensor.anova_timer_remaining", { state: String(mins), attributes: { running: mins > 0 } });
+  } else if (domain === "anova_ble" && service === "stop_cook") {
+    setState(scn, C, { state: "off" });
+    setState(scn, "binary_sensor.anova_cooking", { state: "off" });
+    setState(scn, "sensor.anova_timer_remaining", { attributes: { running: false } });
+  } else if (domain === "number" && service === "set_value") {
+    setState(scn, data.entity_id, { state: String(data.value) });
+  } else if (domain === "button" && service === "press") {
+    const timerSet = scn.hass.states["number.anova_timer"].state;
+    if (data.entity_id === "button.anova_start_timer") {
+      setState(scn, "sensor.anova_timer_remaining", { state: timerSet, attributes: { running: true } });
+    } else if (data.entity_id === "button.anova_stop_timer") {
+      setState(scn, "sensor.anova_timer_remaining", { attributes: { running: false } });
+    }
+  }
+}
+
+async function callService(scn, domain, service, data) {
+  window.__calls.push({ scenario: scn.name, domain, service, data: JSON.parse(JSON.stringify(data)) });
+  if (window.__delay) await new Promise((r) => setTimeout(r, window.__delay));
+  if (window.__fail) throw { code: "failed", message: window.__fail };
+  simulate(scn, domain, service, data);
+}
+
+/* ---------- mount ---------- */
+const params = new URLSearchParams(location.search);
+if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
+if (params.get("width") === "320") document.body.classList.add("narrow");
+
+function mount() {
+  const stage = document.getElementById("stage");
+  for (const [name, s] of Object.entries(SCENARIOS)) {
+    const scn = buildHass(name, s);
+    const cell = document.createElement("div");
+    cell.id = "c-" + name;
+    const card = document.createElement("anova-cooker-card");
+    scn.card = card;
+    card.setConfig({ type: "custom:anova-cooker-card", entity: "climate.anova" });   // HA order: config first
+    cell.appendChild(card);
+    stage.appendChild(cell);
+    card.hass = scn.hass;
+    window.__scn[name] = scn;
+  }
+  // the editor lives below the stage so it does not appear in screenshots
+  const editor = document.createElement("anova-cooker-card-editor");
+  editor.id = "editor";
+  editor.setConfig({ type: "custom:anova-cooker-card", entity: "climate.anova", name: "Sous vide" });
+  editor.hass = window.__scn.cooking.hass;
+  document.getElementById("editor-host").appendChild(editor);
+  window.__configChanges = [];
+  editor.addEventListener("config-changed", (e) =>
+    window.__configChanges.push({ config: e.detail.config, bubbles: e.bubbles, composed: e.composed }));
+}
+</script>
+<!-- the card under test, classic script on purpose -->
+<script src="../../custom_components/anova_ble/frontend/anova-cooker-card.js"></script>
+<script>
+window.__ready = Promise.resolve().then(mount).then(() => true);
+</script>
+</body>
+</html>
