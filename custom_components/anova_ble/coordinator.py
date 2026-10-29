@@ -72,6 +72,8 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState]):
             seconds=entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
         )
         self._failures = 0
+        # True while polls fail because Bluetooth cannot see the cooker.
+        self._waiting_for_cooker = False
         super().__init__(
             hass,
             _LOGGER,
@@ -99,9 +101,33 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState]):
         self.client.set_ble_device(ble_device)
         return True
 
+    @callback
+    def async_handle_advertisement(
+        self,
+        _service_info: bluetooth.BluetoothServiceInfoBleak,
+        _change: bluetooth.BluetoothChange,
+    ) -> None:
+        """Poll at once when a cooker that was out of range is seen again.
+
+        Without this the backoff could keep the entities unavailable for up to
+        ``MAX_BACKOFF_INTERVAL`` after the cooker is switched back on. Only the
+        first advertisement after a dropout triggers a poll.
+        """
+        if not self._waiting_for_cooker:
+            return
+        self._waiting_for_cooker = False
+        _LOGGER.debug("Cooker seen again, polling now")
+        self.update_interval = self.poll_interval
+        self.config_entry.async_create_background_task(
+            self.hass,
+            self.async_request_refresh(),
+            "anova_ble poll after advertisement",
+        )
+
     async def _async_update_data(self) -> AnovaState:
         """Read the cooker, or keep the last data during a short dropout."""
         if not self._async_use_current_ble_device():
+            self._waiting_for_cooker = True
             return self._async_handle_failure(
                 "device_out_of_range",
                 {"address": self.address},
@@ -116,6 +142,7 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState]):
         if self._failures:
             _LOGGER.debug("Poll succeeded after %s failed polls", self._failures)
         self._failures = 0
+        self._waiting_for_cooker = False
         self.update_interval = self.poll_interval
         return state
 

@@ -123,6 +123,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> boo
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_close_link)
     )
+    entry.async_on_unload(
+        bluetooth.async_register_callback(
+            hass,
+            coordinator.async_handle_advertisement,
+            bluetooth.BluetoothCallbackMatcher(address=address, connectable=True),
+            bluetooth.BluetoothScanningMode.PASSIVE,
+        )
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
     return True

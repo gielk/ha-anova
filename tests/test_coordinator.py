@@ -7,6 +7,7 @@ import logging
 from unittest.mock import MagicMock
 
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.components.bluetooth import BluetoothChange
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
@@ -19,6 +20,7 @@ from pytest_homeassistant_custom_component.common import (
 
 from custom_components.anova_ble.const import (
     CONF_POLL_INTERVAL,
+    DEFAULT_POLL_INTERVAL,
     FAILURES_BEFORE_UNAVAILABLE,
     MAX_BACKOFF_INTERVAL,
 )
@@ -330,3 +332,45 @@ async def test_unexpected_error_is_not_swallowed(
 
     assert not coordinator.last_update_success
     assert isinstance(coordinator.last_exception, RuntimeError)
+
+
+async def test_poll_at_once_when_cooker_reappears(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_ble_device: MagicMock,
+    ble_device: MagicMock,
+) -> None:
+    """The first advertisement after a dropout polls without waiting for backoff."""
+    coordinator = get_coordinator(init_integration)
+    mock_ble_device.return_value = None
+    for _ in range(FAILURES_BEFORE_UNAVAILABLE):
+        await poll(hass, freezer, coordinator)
+    assert hass.states.get(CLIMATE_ID).state == STATE_UNAVAILABLE
+    assert coordinator.update_interval.total_seconds() > DEFAULT_POLL_INTERVAL
+
+    mock_ble_device.return_value = ble_device
+    mock_client.read_state.reset_mock()
+    coordinator.async_handle_advertisement(MagicMock(), BluetoothChange.ADVERTISEMENT)
+    await hass.async_block_till_done()
+
+    mock_client.read_state.assert_awaited_once()
+    assert hass.states.get(CLIMATE_ID).state != STATE_UNAVAILABLE
+    assert coordinator.update_interval == timedelta(seconds=DEFAULT_POLL_INTERVAL)
+
+    # Later advertisements of a reachable cooker do not poll again.
+    coordinator.async_handle_advertisement(MagicMock(), BluetoothChange.ADVERTISEMENT)
+    await hass.async_block_till_done()
+    mock_client.read_state.assert_awaited_once()
+
+
+async def test_advertisement_ignored_while_reachable(
+    hass: HomeAssistant, init_integration: MockConfigEntry, mock_client: MagicMock
+) -> None:
+    """Normal advertisements of a reachable cooker never trigger a poll."""
+    coordinator = get_coordinator(init_integration)
+    mock_client.read_state.reset_mock()
+    coordinator.async_handle_advertisement(MagicMock(), BluetoothChange.ADVERTISEMENT)
+    await hass.async_block_till_done()
+    mock_client.read_state.assert_not_awaited()
