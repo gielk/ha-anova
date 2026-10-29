@@ -261,9 +261,9 @@ MIT. See [LICENSE](LICENSE).
 
 ### Wat het is
 
-Deze integratie koppelt een originele Anova Precision Cooker aan Home Assistant. Dat gaat via Bluetooth, rechtstreeks met de cooker. Er is geen cloud en geen account nodig.
+Deze integratie koppelt een originele Anova Precision Cooker aan Home Assistant. Dat gaat via Bluetooth, rechtstreeks met de sous vide stick. Er is geen cloud en geen account nodig.
 
-Anova stopte de ondersteuning voor de app van de originele Bluetooth en Bluetooth+WiFi modellen na 28 september 2025. Met deze integratie kun je de cooker toch bedienen. Ondersteund zijn het 800 W model met alleen Bluetooth en het 900 W model met Bluetooth en WiFi.
+Anova stopte de ondersteuning voor de app van de originele Bluetooth en Bluetooth+WiFi modellen na 28 september 2025. Met deze integratie kun je de sous vide stick toch bedienen. Ondersteund zijn het 800 W model met alleen Bluetooth en het 900 W model met Bluetooth en WiFi.
 
 ### Installeren in 5 stappen
 
@@ -271,10 +271,10 @@ Anova stopte de ondersteuning voor de app van de originele Bluetooth en Bluetoot
 2. Vul als URL in: https://github.com/gielk/ha-anova. Kies als type Integratie en klik op Toevoegen.
 3. Zoek naar Anova Precision Cooker (Bluetooth) en klik op Downloaden.
 4. Start Home Assistant opnieuw.
-5. Sluit de Anova app op je telefoon. Ga naar Instellingen, Apparaten en diensten en voeg de integratie toe. Bij Ontdekt verschijnt de cooker meestal vanzelf.
+5. Sluit de Anova app op je telefoon. Ga naar Instellingen, Apparaten en diensten en voeg de integratie toe. Bij Ontdekt verschijnt de sous vide stick meestal vanzelf.
 
 ### Problemen oplossen
 
-1. **De cooker wordt niet gevonden.** Sluit de Anova app op je telefoon. Haal de stekker van de cooker even uit het stopcontact en steek hem er weer in. Controleer of je Bluetooth adapter of ESPHome proxy werkt in de Bluetooth integratie.
-2. **Het signaal is zwak.** De entiteiten worden onbeschikbaar, maar komen vanzelf weer terug. Zet de cooker dichterbij, of plaats een ESPHome Bluetooth proxy in de keuken.
+1. **De sous vide stick wordt niet gevonden.** Sluit de Anova app op je telefoon. Haal de stekker van de stick even uit het stopcontact en steek hem er weer in. Controleer of je Bluetooth adapter of ESPHome proxy werkt in de Bluetooth integratie.
+2. **Het signaal is zwak.** De entiteiten worden onbeschikbaar, maar komen vanzelf weer terug. Zet de stick dichterbij, of plaats een ESPHome Bluetooth proxy in de keuken.
 3. **Je wilt meer informatie.** Zet debug logging aan voor custom_components.anova_ble. Download daarna de diagnostics via de drie puntjes op de integratiepagina. Controleer het bestand voordat je het deelt.
