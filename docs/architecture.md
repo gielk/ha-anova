@@ -112,6 +112,7 @@ manufacturer `Anova Culinary`, model from `AnovaDeviceInfo.model`,
 | sensor | `status` | enum, options = `DeviceStatus` values, None if unknown |
 | sensor | `rssi` | signal strength, dBm, diagnostic, disabled by default, from `bluetooth.async_last_service_info` |
 | binary_sensor | `cooking` | device class running |
+| binary_sensor | `timer_running` | device class running, timer counting down |
 | number | `timer` | 0 to 6000 min, step 1, box mode, duration device class, sets the timer |
 | button | `start_timer`, `stop_timer` | |
 | select | `temperature_unit` | options `celsius`, `fahrenheit`, config category |
@@ -138,6 +139,7 @@ Target: `entity_id` of the `anova_ble` climate entity.
 * Config: `{ type: "custom:anova-cooker-card", entity: "climate.xxx", name?: string }`.
 * The card finds sibling entities through `hass.entities[climate].device_id`
   and the `translation_key` of each entity on the same device
-  (`timer`, `timer_remaining`, `start_timer`, `stop_timer`, `cooking`, `status`).
+  (`timer`, `timer_remaining`, `start_timer`, `stop_timer`, `cooking`,
+  `timer_running`, `status`).
 * Actions it calls: `climate.set_temperature`, `anova_ble.start_cook`,
   `anova_ble.stop_cook`, `number.set_value` (timer), `button.press`.

@@ -396,12 +396,26 @@ async def test_command_gap(mock_connect: AsyncMock) -> None:
 async def test_set_target_temperature(
     mock_connect: AsyncMock, fakes: list[FakeBleakClient]
 ) -> None:
-    """The unit is read when unknown, then the value is sent."""
+    """The unit is read fresh, then the value is sent in that unit."""
     client = make_client()
     assert await client.set_target_temperature(56.54) == 56.5
     assert fakes[0].commands == ["read unit", "set temp 56.5"]
-    assert await client.set_target_temperature(135, TemperatureUnit.FAHRENHEIT) == 135
-    assert fakes[0].commands[-1] == "set temp 135.0"
+    assert client.unit is TemperatureUnit.CELSIUS
+
+
+async def test_set_target_temperature_converts_units(
+    mock_connect: AsyncMock, replies: dict[str, Reply], fakes: list[FakeBleakClient]
+) -> None:
+    """A value in another unit is converted to the cooker unit."""
+    client = make_client()
+    await client.set_target_temperature(135, TemperatureUnit.FAHRENHEIT)
+    assert fakes[0].commands[-1] == "set temp 57.2"
+    replies["read unit"] = "f"
+    await client.set_target_temperature(56.5, TemperatureUnit.CELSIUS)
+    assert fakes[0].commands[-1] == "set temp 133.7"
+    assert client.unit is TemperatureUnit.FAHRENHEIT
+    await client.set_target_temperature(150)
+    assert fakes[0].commands[-1] == "set temp 150.0"
 
 
 async def test_set_target_temperature_out_of_range(
@@ -411,7 +425,7 @@ async def test_set_target_temperature_out_of_range(
     client = make_client()
     with pytest.raises(AnovaValueError):
         await client.set_target_temperature(150, TemperatureUnit.CELSIUS)
-    assert fakes[0].commands == []
+    assert fakes[0].commands == ["read unit"]
     assert client.is_connected
 
 
@@ -462,6 +476,7 @@ async def test_start_cook_with_timer(
     """The official start sequence, with a timer."""
     await make_client().start_cook(56.5, 120, TemperatureUnit.CELSIUS)
     assert fakes[0].commands == [
+        "read unit",
         "set temp 56.5",
         "stop time",
         "set timer 120",
@@ -494,7 +509,7 @@ async def test_start_cook_validates_first(
     assert mock_connect.call_count == 0
     with pytest.raises(AnovaValueError):
         await client.start_cook(120, 10, TemperatureUnit.CELSIUS)
-    assert fakes[0].commands == []
+    assert fakes[0].commands == ["read unit"]
 
 
 async def test_device_info_wifi(
@@ -525,9 +540,29 @@ async def test_device_info_no_answer(
 ) -> None:
     """An ignored probe is not an error."""
     replies["get id card"] = None
+    client = make_client()
     with patch(f"{MODULE}._PROBE_TIMEOUT", 0.05):
-        info = await make_client().read_device_info()
+        info = await client.read_device_info()
     assert info.id_card is None
+    # The link is reset so a late answer cannot be taken for the next reply.
+    assert not client.is_connected
+    assert (await client.read_state()).status is DeviceStatus.STOPPED
+
+
+async def test_hanging_write_times_out(
+    mock_connect: AsyncMock, fakes: list[FakeBleakClient]
+) -> None:
+    """The command timeout also covers the write."""
+
+    async def _hang(*_args: Any, **_kwargs: Any) -> None:
+        await asyncio.sleep(10)
+
+    client = make_client(command_timeout=0.05)
+    await client.connect()
+    fakes[0].write_gatt_char = _hang  # type: ignore[method-assign]
+    with pytest.raises(AnovaTimeoutError):
+        await client.start()
+    assert not client.is_connected
 
 
 async def test_unsolicited_notification_ignored(

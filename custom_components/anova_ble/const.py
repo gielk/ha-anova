@@ -24,6 +24,10 @@ DEFAULT_CONNECTION_MODE: Final = CONNECTION_MODE_PER_POLL
 FAILURES_BEFORE_UNAVAILABLE: Final = 3
 # Poll interval backoff cap while the cooker cannot be reached.
 MAX_BACKOFF_INTERVAL: Final = 300
+# In per poll mode the link closes this many seconds after the last command.
+PER_POLL_DISCONNECT_DELAY: Final = 2.0
+# Minimum time between two refreshes requested after an action.
+REFRESH_COOLDOWN: Final = 2.0
 
 SERVICE_START_COOK: Final = "start_cook"
 SERVICE_STOP_COOK: Final = "stop_cook"

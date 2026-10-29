@@ -144,11 +144,11 @@ const reg = (platform, device_id, translation_key) => ({ platform, device_id, tr
 
 // Fixed set of scenarios; ids are the same in each, every card has its own hass object.
 const SCENARIOS = {
-  // cooking, still heating, timer of 2 h with 65 min left, timer_remaining carries running=true
+  // cooking, still heating, timer of 2 h with 65 min left, timer_running binary sensor is on
   cooking: { climate: "heat", current: 54.2, target: 56.5, cooking: "on", timerSet: 120, remaining: 65, status: "running", running: true },
-  off: { climate: "off", current: 23.4, target: 56.5, cooking: "off", timerSet: 0, remaining: 0, status: "stopped" },
+  off: { climate: "off", current: 23.4, target: 56.5, cooking: "off", timerSet: 0, remaining: 0, status: "stopped", running: false },
   offline: { climate: "unavailable" },
-  // at temperature, status warning, no `running` attribute: the card infers it from cooking + time left
+  // at temperature, status warning, no timer_running entity: the card infers it from cooking + time left
   warning: { climate: "heat", current: 56.4, target: 56.5, cooking: "on", timerSet: 240, remaining: 180, status: "low_water" },
 };
 
@@ -162,8 +162,7 @@ function buildHass(name, s) {
       hvac_action: s.cooking === "on" ? "heating" : "off", unit: "°C",
     }),
     "number.anova_timer": mk("number.anova_timer", sv(s.timerSet ?? 0), { min: 0, max: 6000, unit_of_measurement: "min" }),
-    "sensor.anova_timer_remaining": mk("sensor.anova_timer_remaining", sv(s.remaining ?? 0),
-      s.running === undefined ? { unit_of_measurement: "min" } : { unit_of_measurement: "min", running: s.running }),
+    "sensor.anova_timer_remaining": mk("sensor.anova_timer_remaining", sv(s.remaining ?? 0), { unit_of_measurement: "min" }),
     "button.anova_start_timer": mk("button.anova_start_timer", unavailable ? "unavailable" : "unknown"),
     "button.anova_stop_timer": mk("button.anova_stop_timer", unavailable ? "unavailable" : "unknown"),
     "binary_sensor.anova_cooking": mk("binary_sensor.anova_cooking", unavailable ? "unavailable" : s.cooking),
@@ -185,6 +184,11 @@ function buildHass(name, s) {
     "binary_sensor.anova_cooking": reg("anova_ble", DEVICE, "cooking"),
     "sensor.anova_status": reg("anova_ble", DEVICE, "status"),
   };
+  if (s.running !== undefined || unavailable) {
+    states["binary_sensor.anova_timer_running"] = mk("binary_sensor.anova_timer_running",
+      unavailable ? "unavailable" : s.running ? "on" : "off");
+    entities["binary_sensor.anova_timer_running"] = reg("anova_ble", DEVICE, "timer_running");
+  }
   const scn = { name, states, entities };
   scn.hass = {
     states, entities, language: "en", locale: { language: "en" },
@@ -203,6 +207,12 @@ function setState(scn, id, patch) {
 }
 window.__setState = (name, id, patch) => setState(window.__scn[name], id, patch);
 
+function setTimerRunning(scn, on) {
+  if (scn.hass.states["binary_sensor.anova_timer_running"]) {
+    setState(scn, "binary_sensor.anova_timer_running", { state: on ? "on" : "off" });
+  }
+}
+
 // Minimal simulation of the integration so the card reacts like it would in HA.
 function simulate(scn, domain, service, data) {
   const C = "climate.anova";
@@ -213,19 +223,21 @@ function simulate(scn, domain, service, data) {
     setState(scn, C, { state: "heat", attributes: { temperature: data.temperature } });
     setState(scn, "binary_sensor.anova_cooking", { state: "on" });
     setState(scn, "number.anova_timer", { state: String(mins) });
-    setState(scn, "sensor.anova_timer_remaining", { state: String(mins), attributes: { running: mins > 0 } });
+    setState(scn, "sensor.anova_timer_remaining", { state: String(mins) });
+    setTimerRunning(scn, mins > 0);
   } else if (domain === "anova_ble" && service === "stop_cook") {
     setState(scn, C, { state: "off" });
     setState(scn, "binary_sensor.anova_cooking", { state: "off" });
-    setState(scn, "sensor.anova_timer_remaining", { attributes: { running: false } });
+    setTimerRunning(scn, false);
   } else if (domain === "number" && service === "set_value") {
     setState(scn, data.entity_id, { state: String(data.value) });
   } else if (domain === "button" && service === "press") {
     const timerSet = scn.hass.states["number.anova_timer"].state;
     if (data.entity_id === "button.anova_start_timer") {
-      setState(scn, "sensor.anova_timer_remaining", { state: timerSet, attributes: { running: true } });
+      setState(scn, "sensor.anova_timer_remaining", { state: timerSet });
+      setTimerRunning(scn, true);
     } else if (data.entity_id === "button.anova_stop_timer") {
-      setState(scn, "sensor.anova_timer_remaining", { attributes: { running: false } });
+      setTimerRunning(scn, false);
     }
   }
 }

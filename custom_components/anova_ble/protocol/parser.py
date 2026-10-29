@@ -153,6 +153,17 @@ def validate_temperature(value: float, unit: TemperatureUnit) -> float:
     return rounded
 
 
+def convert_temperature(
+    value: float, from_unit: TemperatureUnit, to_unit: TemperatureUnit
+) -> float:
+    """Convert between Celsius and Fahrenheit."""
+    if from_unit is to_unit:
+        return value
+    if to_unit is TemperatureUnit.FAHRENHEIT:
+        return value * 9 / 5 + 32
+    return (value - 32) * 5 / 9
+
+
 def validate_timer(minutes: int) -> int:
     """Check the timer range in minutes."""
     if isinstance(minutes, bool) or int(minutes) != minutes:

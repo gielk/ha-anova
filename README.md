@@ -105,6 +105,7 @@ The entity IDs in this README are examples. Your IDs can be different.
 | `sensor` | `status` | Cooker status, for example running or low water. |
 | `sensor` | `rssi` | Bluetooth signal strength in dBm. Diagnostic, disabled by default. |
 | `binary_sensor` | `cooking` | On while the cooker is cooking. |
+| `binary_sensor` | `timer_running` | On while the timer counts down. |
 | `number` | `timer` | Timer from 0 to 6000 minutes. Setting it sets the timer on the cooker. |
 | `button` | `start_timer`, `stop_timer` | Start or stop the countdown. |
 | `select` | `temperature_unit` | Celsius or Fahrenheit. |

@@ -1,0 +1,26 @@
+start_cook:
+  target:
+    entity:
+      integration: anova_ble
+      domain: climate
+  fields:
+    temperature:
+      required: true
+      example: 56.5
+      selector:
+        number:
+          min: 5
+          max: 212
+          step: 0.1
+          mode: box
+    duration:
+      required: false
+      example: "02:00:00"
+      selector:
+        duration:
+
+stop_cook:
+  target:
+    entity:
+      integration: anova_ble
+      domain: climate

@@ -1,0 +1,70 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "cooking": {
+        "default": "mdi:pot-steam-outline",
+        "state": {
+          "on": "mdi:pot-steam"
+        }
+      },
+      "timer_running": {
+        "default": "mdi:timer-off-outline",
+        "state": {
+          "on": "mdi:timer-sand"
+        }
+      }
+    },
+    "button": {
+      "start_timer": {
+        "default": "mdi:timer-play"
+      },
+      "stop_timer": {
+        "default": "mdi:timer-stop"
+      }
+    },
+    "climate": {
+      "cooker": {
+        "default": "mdi:pot-steam"
+      }
+    },
+    "number": {
+      "timer": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "select": {
+      "temperature_unit": {
+        "default": "mdi:temperature-celsius",
+        "state": {
+          "celsius": "mdi:temperature-celsius",
+          "fahrenheit": "mdi:temperature-fahrenheit"
+        }
+      }
+    },
+    "sensor": {
+      "current_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "rssi": {
+        "default": "mdi:signal"
+      },
+      "status": {
+        "default": "mdi:state-machine"
+      },
+      "target_temperature": {
+        "default": "mdi:thermometer-check"
+      },
+      "timer_remaining": {
+        "default": "mdi:timer-sand"
+      }
+    }
+  },
+  "services": {
+    "start_cook": {
+      "service": "mdi:pot-steam"
+    },
+    "stop_cook": {
+      "service": "mdi:stop-circle-outline"
+    }
+  }
+}

@@ -1,2 +1,5 @@
 # Test dependencies. This pin also sets Home Assistant to 2026.10.4.
 pytest-homeassistant-custom-component==0.13.375
+# Requirements of the usb integration, which the bluetooth integration imports.
+aiousbwatcher==1.1.2
+serialx==1.11.0

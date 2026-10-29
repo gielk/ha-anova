@@ -1,0 +1,149 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "This cooker is already set up.",
+      "already_in_progress": "Setup of this cooker is already in progress.",
+      "no_devices_found": "No Anova cookers found. Make sure the cooker is plugged in and in range of a Bluetooth adapter or proxy, and close the Anova app on your phone.",
+      "not_supported": "This device is not a supported Anova Precision Cooker."
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the cooker. Close the Anova app on your phone, move the cooker closer to the Bluetooth adapter or proxy, and try again.",
+      "unknown": "Unexpected error. Check the logs for details."
+    },
+    "flow_title": "{name}",
+    "step": {
+      "bluetooth_confirm": {
+        "description": "Do you want to set up {name}? Close the Anova app on your phone first. The cooker accepts only one Bluetooth connection."
+      },
+      "user": {
+        "data": {
+          "address": "Cooker"
+        },
+        "data_description": {
+          "address": "The Anova cookers found by Bluetooth."
+        },
+        "description": "Choose the cooker to set up. Close the Anova app on your phone first. The cooker accepts only one Bluetooth connection."
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "cooking": {
+        "name": "Cooking"
+      },
+      "timer_running": {
+        "name": "Timer running"
+      }
+    },
+    "button": {
+      "start_timer": {
+        "name": "Start timer"
+      },
+      "stop_timer": {
+        "name": "Stop timer"
+      }
+    },
+    "number": {
+      "timer": {
+        "name": "Timer"
+      }
+    },
+    "select": {
+      "temperature_unit": {
+        "name": "Temperature unit",
+        "state": {
+          "celsius": "Celsius",
+          "fahrenheit": "Fahrenheit"
+        }
+      }
+    },
+    "sensor": {
+      "current_temperature": {
+        "name": "Current temperature"
+      },
+      "rssi": {
+        "name": "Signal strength"
+      },
+      "status": {
+        "name": "Status",
+        "state": {
+          "heater_error": "Heater error",
+          "low_water": "Low water",
+          "power_loss": "Power loss",
+          "running": "Running",
+          "stopped": "Stopped",
+          "user_change_parameter": "Changed on the cooker"
+        }
+      },
+      "target_temperature": {
+        "name": "Target temperature"
+      },
+      "timer_remaining": {
+        "name": "Timer remaining"
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "The cooker did not accept the command: {error}"
+    },
+    "device_not_found": {
+      "message": "Could not find the Anova cooker with address {address}. Make sure it is plugged in and in range of a Bluetooth adapter or proxy. {reason}"
+    },
+    "device_out_of_range": {
+      "message": "The Anova cooker {address} is out of Bluetooth range."
+    },
+    "invalid_value": {
+      "message": "Invalid value: {error}"
+    },
+    "missing_address": {
+      "message": "This config entry has no Bluetooth address. Remove it and add the cooker again."
+    },
+    "update_failed": {
+      "message": "Could not read the cooker: {error}"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "connection_mode": "Connection mode",
+          "poll_interval": "Poll interval"
+        },
+        "data_description": {
+          "connection_mode": "Per poll: Home Assistant disconnects after each poll, so the phone app can connect in between. This costs a reconnect for every poll. Keep connected: updates are faster, but the cooker accepts only one Bluetooth connection, so the phone app cannot connect while Home Assistant holds it.",
+          "poll_interval": "How often Home Assistant reads the cooker, in seconds (5 to 300). A short interval uses more Bluetooth traffic. While the cooker cannot be reached, Home Assistant waits longer between polls."
+        },
+        "description": "Choose how Home Assistant talks to the cooker. The cooker accepts only one Bluetooth connection at a time."
+      }
+    }
+  },
+  "selector": {
+    "connection_mode": {
+      "options": {
+        "per_poll": "Per poll (phone app can connect between polls)",
+        "persistent": "Keep connected (blocks the phone app)"
+      }
+    }
+  },
+  "services": {
+    "start_cook": {
+      "description": "Sets the target temperature, starts heating and starts the timer when a duration is given.",
+      "fields": {
+        "duration": {
+          "description": "How long to cook. Rounded up to whole minutes. Leave empty to cook without a timer.",
+          "name": "Duration"
+        },
+        "temperature": {
+          "description": "Target water temperature, in the unit system of Home Assistant.",
+          "name": "Temperature"
+        }
+      },
+      "name": "Start cook"
+    },
+    "stop_cook": {
+      "description": "Stops heating and the timer.",
+      "name": "Stop cook"
+    }
+  }
+}

@@ -23,6 +23,7 @@ from custom_components.anova_ble.protocol.parser import (
     cmd_set_temperature,
     cmd_set_timer,
     cmd_set_unit,
+    convert_temperature,
     encode_command,
     parse_float,
     parse_int,
@@ -253,3 +254,12 @@ def test_device_info_model(id_card: str | None, wifi: bool, model: str) -> None:
     info = AnovaDeviceInfo(id_card=id_card, firmware_version=None)
     assert info.has_wifi is wifi
     assert info.model == model
+
+
+def test_convert_temperature() -> None:
+    """Celsius and Fahrenheit conversion."""
+    c, f = TemperatureUnit.CELSIUS, TemperatureUnit.FAHRENHEIT
+    assert convert_temperature(100, c, f) == 212
+    assert convert_temperature(212, f, c) == 100
+    assert convert_temperature(56.5, c, c) == 56.5
+    assert round(convert_temperature(135, f, c), 1) == 57.2

@@ -34,6 +34,7 @@
     start_timer: "button",
     stop_timer: "button",
     cooking: "binary_sensor",
+    timer_running: "binary_sensor",
     status: "sensor",
   };
 
@@ -500,14 +501,17 @@
         progress = target > min ? clamp((current - min) / (target - min), 0, 1) : current >= target ? 1 : 0;
       }
 
-      // Timer. The contract has no "timer running" entity: use a `running` attribute on
-      // timer_remaining when present, otherwise assume it runs while cooking with time left.
+      // Timer. Prefer the timer_running binary sensor; without it, assume the timer
+      // runs while cooking with time left.
       const tNum = S("timer");
       const tRem = S("timer_remaining");
+      const tRun = S("timer_running");
       const timerSet = numState(tNum);
       const remaining = numState(tRem);
-      const runAttr = tRem && tRem.attributes ? tRem.attributes.running : undefined;
-      const timerRunning = cooking && remaining !== null && remaining > 0 && runAttr !== false && runAttr !== "false";
+      const timerRunning =
+        tRun && (tRun.state === "on" || tRun.state === "off")
+          ? tRun.state === "on"
+          : cooking && remaining !== null && remaining > 0;
 
       const statusSt = S("status");
       const warn = statusSt && WARN_STATUS[statusSt.state] ? statusSt.state : null;

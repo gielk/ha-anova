@@ -52,6 +52,7 @@ from .parser import (
     cmd_set_temperature,
     cmd_set_timer,
     cmd_set_unit,
+    convert_temperature,
     encode_command,
     parse_float,
     parse_int,
@@ -104,6 +105,7 @@ class AnovaClient:
         self._disconnect_handle: asyncio.TimerHandle | None = None
         self._disconnect_task: asyncio.Task[None] | None = None
         self._commands_sent = 0
+        self._reset_after_session = False
         self._unit: TemperatureUnit | None = None
 
     @property
@@ -198,11 +200,15 @@ class AnovaClient:
     async def set_target_temperature(
         self, temperature: float, unit: TemperatureUnit | None = None
     ) -> float:
-        """Set the target temperature, in ``unit`` or the cooker unit."""
+        """Set the target temperature and return the value the cooker echoed.
+
+        ``temperature`` is in ``unit`` (default: the cooker unit). The cooker
+        unit is read first and the value converted, so a unit changed on the
+        cooker itself can never make it heat to the wrong temperature.
+        """
         async with self._session():
-            unit = await self._resolve_unit(unit)
-            response = await self._send(cmd_set_temperature(temperature, unit))
-            return parse_float(response)
+            command = await self._set_temperature_command(temperature, unit)
+            return parse_float(await self._send(command))
 
     async def set_timer(self, minutes: int) -> int:
         """Set the timer in whole minutes (0 to 6000)."""
@@ -232,11 +238,14 @@ class AnovaClient:
         minutes: int | None = None,
         unit: TemperatureUnit | None = None,
     ) -> None:
-        """Set temperature and timer and start, using the official sequence."""
+        """Set temperature and timer and start, using the official sequence.
+
+        ``temperature`` is in ``unit`` (default: the cooker unit), see
+        :meth:`set_target_temperature`.
+        """
         minutes = validate_timer(minutes or 0)
         async with self._session():
-            unit = await self._resolve_unit(unit)
-            await self._send(cmd_set_temperature(temperature, unit))
+            await self._send(await self._set_temperature_command(temperature, unit))
             await self._send(CMD_STOP_TIMER)
             await self._send(cmd_set_timer(minutes))
             await self._send(CMD_START)
@@ -269,7 +278,11 @@ class AnovaClient:
                 # A response may still arrive for an aborted command.
                 await self._disconnect_locked()
                 raise
+            else:
+                if self._reset_after_session:
+                    await self._disconnect_locked()
             finally:
+                self._reset_after_session = False
                 self._schedule_disconnect()
 
     async def _ensure_connected(self) -> None:
@@ -353,12 +366,15 @@ class AnovaClient:
 
     # Command handling -----------------------------------------------------
 
-    async def _resolve_unit(self, unit: TemperatureUnit | None) -> TemperatureUnit:
+    async def _set_temperature_command(
+        self, temperature: float, unit: TemperatureUnit | None
+    ) -> str:
+        """Read the cooker unit and build ``set temp`` in that unit."""
         if unit is not None:
-            return TemperatureUnit(unit)
-        if self._unit is None:
-            self._unit = parse_unit(await self._send(CMD_READ_UNIT))
-        return self._unit
+            unit = TemperatureUnit(unit)
+        self._unit = parse_unit(await self._send(CMD_READ_UNIT))
+        value = convert_temperature(temperature, unit or self._unit, self._unit)
+        return cmd_set_temperature(value, self._unit)
 
     async def _probe(self, command: str) -> str | None:
         """Send an optional command. None when it is rejected or ignored."""
@@ -368,6 +384,8 @@ class AnovaClient:
             return None
         except AnovaTimeoutError:
             _LOGGER.debug("%s: no answer to optional %r", self.name, command)
+            # A late answer could be taken for the next reply: start clean.
+            self._reset_after_session = True
             return None
 
     async def _send(self, command: str, response_timeout: float | None = None) -> str:
@@ -381,9 +399,9 @@ class AnovaClient:
         self._assembler.reset()
         self._response = asyncio.get_running_loop().create_future()
         try:
-            for chunk in encode_command(command):
-                await client.write_gatt_char(char, chunk, response=False)
             async with asyncio.timeout(response_timeout or self._command_timeout):
+                for chunk in encode_command(command):
+                    await client.write_gatt_char(char, chunk, response=False)
                 response = await self._response
         except TimeoutError as err:
             raise AnovaTimeoutError(f"{self.name}: no answer to {command!r}") from err
