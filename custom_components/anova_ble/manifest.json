@@ -12,6 +12,9 @@
       "connectable": true
     }
   ],
+  "categories": [
+    "appliances_cleaning.cooking"
+  ],
   "codeowners": [
     "@gielk"
   ],
