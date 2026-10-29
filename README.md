@@ -94,7 +94,7 @@ Connection modes:
 
 ## Entities
 
-The entity IDs in this README are examples. Your IDs can be different.
+A new cooker is named after the last 4 characters of its Bluetooth address, for example `Anova (2D60)`. Its entity IDs then start with `anova_2d60`, like `climate.anova_2d60`. The IDs in this README use that example. Yours will have your own 4 characters.
 
 | Platform | Entity (key) | Notes |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ Example for metric units. This starts a 2 hour cook at 56.5 °C:
 ```yaml
 action: anova_ble.start_cook
 target:
-  entity_id: climate.anova_precision_cooker
+  entity_id: climate.anova_2d60
 data:
   temperature: 56.5
   duration: "02:00:00"
@@ -138,7 +138,7 @@ Stop the cook:
 ```yaml
 action: anova_ble.stop_cook
 target:
-  entity_id: climate.anova_precision_cooker
+  entity_id: climate.anova_2d60
 ```
 
 The entity ID is an example. Use the ID of your own cooker.
@@ -151,7 +151,7 @@ Add a card with this YAML:
 
 ```yaml
 type: custom:anova-cooker-card
-entity: climate.anova_precision_cooker
+entity: climate.anova_2d60
 ```
 
 Add `name` to set a different title.
@@ -168,16 +168,17 @@ If you want the same view with the cards that come with Home Assistant, use this
 type: vertical-stack
 cards:
   - type: thermostat
-    entity: climate.anova_precision_cooker
+    entity: climate.anova_2d60
   - type: entities
     title: Timer
     entities:
-      - entity: number.anova_precision_cooker_timer
-      - entity: sensor.anova_precision_cooker_timer_remaining
-      - entity: button.anova_precision_cooker_start_timer
-      - entity: button.anova_precision_cooker_stop_timer
-      - entity: sensor.anova_precision_cooker_status
-      - entity: binary_sensor.anova_precision_cooker_cooking
+      - entity: number.anova_2d60_timer
+      - entity: sensor.anova_2d60_timer_remaining
+      - entity: button.anova_2d60_start_timer
+      - entity: button.anova_2d60_stop_timer
+      - entity: sensor.anova_2d60_status
+      - entity: binary_sensor.anova_2d60_cooking
+      - entity: binary_sensor.anova_2d60_timer_running
 ```
 
 ## Range and signal
