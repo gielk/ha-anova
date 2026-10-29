@@ -94,7 +94,7 @@ Connection modes:
 
 ## Entities
 
-A new cooker is named after the last 4 characters of its Bluetooth address, for example `Anova (2D60)`. Its entity IDs then start with `anova_2d60`, like `climate.anova_2d60`. The IDs in this README use that example. Yours will have your own 4 characters.
+A new cooker is named after the last 4 characters of its Bluetooth address, for example `Anova (2D60)`. Its entity IDs then start with `anova_2d60`, like `climate.anova_2d60`. The IDs in this README use that example. Yours will have your own 4 characters. Home Assistant builds the rest of each ID from the entity name in your language, so a Dutch install gets for example `sensor.anova_2d60_huidige_temperatuur`. The dashboard card finds its entities by itself, so this does not matter for the card.
 
 | Platform | Entity (key) | Notes |
 | --- | --- | --- |
