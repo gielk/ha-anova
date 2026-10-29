@@ -92,9 +92,14 @@ def _decode(data: bytes | bytearray) -> str:
     return data.decode("ascii", errors="ignore").strip()
 
 
+def is_rejected(response: str) -> bool:
+    """Return True for the cooker's ``Invalid Command`` answer."""
+    return response.strip().lower() == RESPONSE_INVALID_COMMAND
+
+
 def check_response(response: str) -> str:
     """Raise when the cooker rejected the command."""
-    if response.strip().lower() == RESPONSE_INVALID_COMMAND:
+    if is_rejected(response):
         raise AnovaCommandError(response)
     return response
 

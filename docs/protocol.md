@@ -43,6 +43,22 @@ If a chunk shorter than 20 bytes arrives without a terminator, the client
 waits a short grace period (0.3 s) for more data and then treats the buffer
 as complete. Surrounding whitespace is stripped.
 
+### Clearing the line after connecting (seen on a real cooker)
+
+On a real cooker the very first command after connecting (`status`) was
+answered with `Invalid Command`, twice, while the link itself was fine.
+The most likely cause is a partial line left in the cooker's input buffer
+by the BLE module when the link comes up, so the first command arrives
+garbled. The decompiled app (D) sends an "empty" command between commands
+for the same reason.
+
+The client therefore:
+
+1. sends an empty command (`\r`) right after enabling notifications and
+   drops whatever comes back within about a second, and
+2. retries a command once, after clearing the line again, when the answer
+   is `Invalid Command`. All commands used here are safe to repeat.
+
 ## Commands used by this integration
 
 | Command | Example response | Notes | Refs |

@@ -15,6 +15,11 @@ MAX_CHUNK_SIZE: Final = 20
 DEFAULT_COMMAND_TIMEOUT: Final = 15.0
 # Wait this long for more data after a short chunk without a terminator.
 RESPONSE_GRACE_PERIOD: Final = 0.3
+# After connecting, an empty command clears any partial line in the cooker
+# (the Anova app also sends empty commands between commands). Wait this long
+# for its answer, then this long for stray data, and drop all of it.
+FLUSH_TIMEOUT: Final = 1.0
+FLUSH_SETTLE: Final = 0.2
 # Small pause between two commands, the official docs ask to space commands.
 DEFAULT_COMMAND_GAP: Final = 0.1
 # Close an idle connection after this many seconds (None keeps it open).

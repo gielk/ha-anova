@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
+import contextlib
 from contextlib import asynccontextmanager
 import logging
 
@@ -36,6 +37,8 @@ from .const import (
     DEFAULT_COMMAND_TIMEOUT,
     DEFAULT_CONNECT_ATTEMPTS,
     DEFAULT_DISCONNECT_DELAY,
+    FLUSH_SETTLE,
+    FLUSH_TIMEOUT,
     RESPONSE_GRACE_PERIOD,
 )
 from .exceptions import (
@@ -54,6 +57,7 @@ from .parser import (
     cmd_set_unit,
     convert_temperature,
     encode_command,
+    is_rejected,
     parse_float,
     parse_int,
     parse_status,
@@ -343,6 +347,7 @@ class AnovaClient:
         self._char = char
         self._assembler.reset()
         _LOGGER.debug("%s: connected", self.name)
+        await self._flush_line()
 
     async def _disconnect_locked(self) -> None:
         client, self._client = self._client, None
@@ -425,6 +430,32 @@ class AnovaClient:
             return None
 
     async def _send(self, command: str, response_timeout: float | None = None) -> str:
+        """Send a command and return its answer, retrying once when rejected.
+
+        Right after connecting the cooker can still hold part of a line, so
+        a valid command arrives garbled and is answered with "Invalid
+        Command". Clearing the line and sending it again fixes that. Every
+        command used here is safe to repeat.
+        """
+        response = await self._exchange(command, response_timeout)
+        if is_rejected(response):
+            _LOGGER.debug(
+                "%s: %r rejected, clearing the line and retrying", self.name, command
+            )
+            await self._flush_line()
+            response = await self._exchange(command, response_timeout)
+        return check_response(response)
+
+    async def _flush_line(self) -> None:
+        """Send an empty command and drop whatever comes back."""
+        # No answer is fine: nothing was pending, or the answer got lost.
+        with contextlib.suppress(AnovaTimeoutError):
+            await self._exchange("", FLUSH_TIMEOUT)
+        await asyncio.sleep(FLUSH_SETTLE)
+        self._assembler.reset()
+
+    async def _exchange(self, command: str, response_timeout: float | None) -> str:
+        """Write one command and wait for one raw answer."""
         self._raise_if_closed()
         client, char = self._client, self._char
         if client is None or char is None:
@@ -451,7 +482,7 @@ class AnovaClient:
                 response_future.exception()
             self._cancel_grace()
         _LOGGER.debug("%s: %r -> %r", self.name, command, response)
-        return check_response(response)
+        return response
 
     def _handle_notification(
         self, _char: BleakGATTCharacteristic, data: bytearray

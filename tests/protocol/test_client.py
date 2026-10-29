@@ -56,6 +56,9 @@ class FakeBleakClient:
         self.is_connected = True
         self.writes: list[bytes] = []
         self.commands: list[str] = []
+        self.flushes = 0
+        # Bytes left in the cooker's line buffer at connect, see banner tests.
+        self.line_buffer = b""
         self.char = MagicMock(uuid=CHARACTERISTIC_UUID)
         self.services = MagicMock()
         self.services.get_characteristic.return_value = self.char
@@ -63,7 +66,6 @@ class FakeBleakClient:
         self.clear_cache = AsyncMock()
         self.notify: Callable[[Any, bytearray], None] | None = None
         self.disconnected_callback: Callable[[Any], None] | None = None
-        self._pending = b""
 
     async def start_notify(self, char: Any, callback: Any) -> None:
         """Remember the notification callback."""
@@ -78,12 +80,21 @@ class FakeBleakClient:
         assert response is False
         assert len(data) <= 20
         self.writes.append(bytes(data))
-        self._pending += bytes(data)
-        if self._pending.endswith(b"\r"):
-            command = self._pending[:-1].decode()
-            self._pending = b""
-            self.commands.append(command)
-            self._answer(command)
+        self.line_buffer += bytes(data)
+        if self.line_buffer.endswith(b"\r"):
+            line = self.line_buffer[:-1].decode()
+            self.line_buffer = b""
+            if line == "":
+                self.flushes += 1
+                self._answer_flush()
+                return
+            self.commands.append(line)
+            self._answer(line)
+
+    def _answer_flush(self) -> None:
+        reply = self.replies.get("", "Invalid Command")
+        if reply is not None:
+            self._send_chunks([f"{reply}\r".encode()])
 
     def _answer(self, command: str) -> None:
         reply = self.replies.get(command, "Invalid Command")
@@ -103,6 +114,9 @@ class FakeBleakClient:
             chunks = [reply]
         else:
             chunks = reply
+        self._send_chunks(chunks)
+
+    def _send_chunks(self, chunks: list[bytes]) -> None:
         loop = asyncio.get_running_loop()
         for chunk in chunks:
             loop.call_soon(self._deliver, chunk)
@@ -150,6 +164,8 @@ def mock_connect(
     with (
         patch(f"{MODULE}.establish_connection", side_effect=_connect) as mock,
         patch(f"{MODULE}.RESPONSE_GRACE_PERIOD", 0.01),
+        patch(f"{MODULE}.FLUSH_TIMEOUT", 0.05),
+        patch(f"{MODULE}.FLUSH_SETTLE", 0.01),
     ):
         yield mock
 
@@ -388,10 +404,11 @@ async def test_commands_are_serialized(
 
 async def test_command_gap(mock_connect: AsyncMock) -> None:
     """Commands in one session are spaced."""
-    client = make_client(command_gap=0.01)
+    client = make_client(command_gap=0.02)
     with patch(f"{MODULE}.asyncio.sleep", wraps=asyncio.sleep) as sleep:
         await client.read_state()
-    assert sleep.await_count == 4
+    gaps = [c for c in sleep.await_args_list if c.args == (0.02,)]
+    assert len(gaps) == 5  # after the line flush and between the 5 reads
 
 
 async def test_set_target_temperature(
@@ -533,7 +550,8 @@ async def test_device_info_bluetooth_only(
     assert info.id_card is None
     assert not info.has_wifi
     assert info.firmware_version is None
-    assert fakes[0].commands == ["get id card"]
+    # Rejected once, retried once after clearing the line.
+    assert fakes[0].commands == ["get id card", "get id card"]
 
 
 async def test_device_info_no_answer(
@@ -702,3 +720,61 @@ async def test_idle_disconnect_error_is_swallowed(
     fakes[0].disconnect.side_effect = RuntimeError("boom")
     await asyncio.sleep(0.05)
     assert not client.is_connected
+
+
+async def test_line_is_flushed_after_connect(
+    mock_connect: AsyncMock, fakes: list[FakeBleakClient]
+) -> None:
+    """Junk left in the cooker's line buffer does not garble the first command.
+
+    Seen on a real cooker: right after connecting, the first ``status`` was
+    answered with "Invalid Command" twice.
+    """
+
+    async def _connect_with_junk(
+        _cls: Any, _device: Any, _name: str, **kwargs: Any
+    ) -> FakeBleakClient:
+        fake = FakeBleakClient(default_replies())
+        fake.line_buffer = b"OK+CONN\n"
+        fake.disconnected_callback = kwargs["disconnected_callback"]
+        fakes.append(fake)
+        return fake
+
+    mock_connect.side_effect = _connect_with_junk
+    state = await make_client().read_state()
+    assert state.status is DeviceStatus.STOPPED
+    # The empty command ended the junk line, so status was sent only once.
+    assert fakes[0].commands[:2] == ["OK+CONN\n", "status"]
+
+
+async def test_flush_without_answer(
+    mock_connect: AsyncMock, replies: dict[str, Reply], fakes: list[FakeBleakClient]
+) -> None:
+    """A cooker that ignores the empty command still works."""
+    replies[""] = None
+    state = await make_client().read_state()
+    assert state.current_temperature == 23.4
+    assert fakes[0].flushes == 1
+
+
+async def test_garbled_command_is_retried_once(
+    mock_connect: AsyncMock, replies: dict[str, Reply], fakes: list[FakeBleakClient]
+) -> None:
+    """One rejection is retried after clearing the line."""
+    answers = iter(["Invalid Command", "running"])
+    replies["status"] = lambda _command: next(answers)
+    state = await make_client().read_state()
+    assert state.status is DeviceStatus.RUNNING
+    assert fakes[0].commands[:2] == ["status", "status"]
+    assert fakes[0].flushes == 2
+
+
+async def test_rejected_twice_raises(
+    mock_connect: AsyncMock, fakes: list[FakeBleakClient]
+) -> None:
+    """A command the cooker really does not know fails after one retry."""
+    client = make_client()
+    with pytest.raises(AnovaCommandError):
+        await client.send_command("bogus")
+    assert fakes[0].commands == ["bogus", "bogus"]
+    assert client.is_connected
