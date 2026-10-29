@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches manifest version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python3 -c "import json;print(json.load(open('custom_components/anova_ble/manifest.json'))['version'])")"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match manifest version $version"
+            exit 1
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          python3 - <<'PY'
+          import os, re
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          match = re.search(rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+          notes = match.group(1).strip() if match else f"Release {version}"
+          open("release_notes.md", "w", encoding="utf-8").write(notes + "\n")
+          PY
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md

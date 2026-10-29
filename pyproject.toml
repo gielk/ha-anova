@@ -1,0 +1,29 @@
+[tool.ruff]
+target-version = "py314"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC", "PL", "PT", "D"]
+ignore = [
+    "D202",
+    "D203",
+    "D213",
+    "PLR0913",
+    "PLR2004",
+    "PLR0911",
+    "PLR0912",
+    "PLR0915",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "PLR", "S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components"]
+force-sort-within-sections = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a problem with the Anova Precision Cooker (Bluetooth) integration.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Logs and diagnostics help a lot.
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.10.4"
+    validations:
+      required: true
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: The version in custom_components/anova_ble/manifest.json, or the version shown in HACS.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: cooker_model
+    attributes:
+      label: Cooker model
+      options:
+        - 800 W (Bluetooth only)
+        - 900 W (Bluetooth and WiFi)
+        - Unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: bluetooth_path
+    attributes:
+      label: Bluetooth path
+      options:
+        - Local Bluetooth adapter
+        - ESPHome Bluetooth proxy
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: rssi
+    attributes:
+      label: Signal strength (RSSI)
+      description: The value of the RSSI sensor in dBm, for example -70. Enable the sensor first if it is disabled.
+      placeholder: "-70 dBm"
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Turn on debug logging for custom_components.anova_ble, reproduce the problem, and paste the relevant lines here.
+      render: shell
+  - type: markdown
+    attributes:
+      value: |
+        Please attach the diagnostics file. Open the integration entry, click the three dots in the top right corner, and click Download diagnostics. Review the file before you upload it.
