@@ -104,6 +104,8 @@ class AnovaClient:
         self._grace_handle: asyncio.TimerHandle | None = None
         self._disconnect_handle: asyncio.TimerHandle | None = None
         self._disconnect_task: asyncio.Task[None] | None = None
+        self._connect_task: asyncio.Task[BleakClientWithServiceCache] | None = None
+        self._closed = False
         self._commands_sent = 0
         self._reset_after_session = False
         self._unit: TemperatureUnit | None = None
@@ -138,6 +140,20 @@ class AnovaClient:
         """Open the link now (normally this happens on demand)."""
         async with self._session():
             pass
+
+    async def close(self) -> None:
+        """Close the link for good, aborting a connect or command in progress.
+
+        Use this when the owner goes away (unload, shutdown). Every later call
+        raises ``AnovaConnectionError``, so nothing can reopen the link.
+        """
+        self._closed = True
+        self._cancel_disconnect_timer()
+        self._fail_pending(AnovaConnectionError(f"{self.name}: client closed"))
+        if self._connect_task is not None:
+            self._connect_task.cancel()
+        async with self._lock:
+            await self._disconnect_locked()
 
     async def disconnect(self) -> None:
         """Close the link and cancel any pending idle disconnect."""
@@ -261,6 +277,7 @@ class AnovaClient:
         async with self._lock:
             self._commands_sent = 0
             try:
+                self._raise_if_closed()
                 await self._ensure_connected()
                 yield
             except AnovaCommandError, AnovaValueError:
@@ -290,14 +307,26 @@ class AnovaClient:
             return
         self._client = None
         _LOGGER.debug("%s: connecting", self.name)
-        client = await establish_connection(
-            BleakClientWithServiceCache,
-            self._ble_device,
-            self.name,
-            disconnected_callback=self._handle_disconnected,
-            max_attempts=self._connect_attempts,
-            ble_device_callback=lambda: self._ble_device,
+        # A separate task, so close() can abort a slow connect at once.
+        self._connect_task = asyncio.get_running_loop().create_task(
+            establish_connection(
+                BleakClientWithServiceCache,
+                self._ble_device,
+                self.name,
+                disconnected_callback=self._handle_disconnected,
+                max_attempts=self._connect_attempts,
+                ble_device_callback=lambda: self._ble_device,
+            )
         )
+        try:
+            client = await self._connect_task
+        except asyncio.CancelledError:
+            task = asyncio.current_task()
+            if self._closed and task is not None and not task.cancelling():
+                raise AnovaConnectionError(f"{self.name}: client closed") from None
+            raise
+        finally:
+            self._connect_task = None
         char = client.services.get_characteristic(CHARACTERISTIC_UUID)
         if char is None:
             await client.clear_cache()
@@ -360,9 +389,16 @@ class AnovaClient:
         )
 
     async def _idle_disconnect(self) -> None:
-        async with self._lock:
-            if self._disconnect_handle is None:
-                await self._disconnect_locked()
+        try:
+            async with self._lock:
+                if self._disconnect_handle is None:
+                    await self._disconnect_locked()
+        except Exception as err:  # Nobody awaits this task, never let it fail.
+            _LOGGER.debug("%s: idle disconnect failed: %s", self.name, err)
+
+    def _raise_if_closed(self) -> None:
+        if self._closed:
+            raise AnovaConnectionError(f"{self.name}: client closed")
 
     # Command handling -----------------------------------------------------
 
@@ -389,6 +425,7 @@ class AnovaClient:
             return None
 
     async def _send(self, command: str, response_timeout: float | None = None) -> str:
+        self._raise_if_closed()
         client, char = self._client, self._char
         if client is None or char is None:
             raise AnovaConnectionError(f"{self.name}: not connected")
@@ -397,7 +434,7 @@ class AnovaClient:
         self._commands_sent += 1
 
         self._assembler.reset()
-        self._response = asyncio.get_running_loop().create_future()
+        self._response = response_future = asyncio.get_running_loop().create_future()
         try:
             async with asyncio.timeout(response_timeout or self._command_timeout):
                 for chunk in encode_command(command):
@@ -407,6 +444,11 @@ class AnovaClient:
             raise AnovaTimeoutError(f"{self.name}: no answer to {command!r}") from err
         finally:
             self._response = None
+            # The link can drop during a write: the write then raises and the
+            # future holds an error nobody awaited. Retrieve it to avoid an
+            # "exception was never retrieved" error in the log.
+            if response_future.done() and not response_future.cancelled():
+                response_future.exception()
             self._cancel_grace()
         _LOGGER.debug("%s: %r -> %r", self.name, command, response)
         return check_response(response)

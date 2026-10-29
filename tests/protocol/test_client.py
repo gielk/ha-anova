@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Generator
+import gc
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -606,4 +607,98 @@ async def test_cancelled_command_disconnects(
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
+    assert not client.is_connected
+
+
+async def test_close_aborts_slow_connect(mock_connect: AsyncMock) -> None:
+    """close() does not wait for a connect that hangs at the edge of range."""
+
+    async def _hang(*_args: Any, **_kwargs: Any) -> FakeBleakClient:
+        await asyncio.sleep(10)
+        raise AssertionError("not reached")
+
+    mock_connect.side_effect = _hang
+    client = make_client()
+    poll = asyncio.create_task(client.read_state())
+    await asyncio.sleep(0.02)
+    await asyncio.wait_for(client.close(), 1)
+    with pytest.raises(AnovaConnectionError, match="closed"):
+        await poll
+
+
+async def test_close_aborts_pending_command(
+    mock_connect: AsyncMock, replies: dict[str, Reply]
+) -> None:
+    """close() fails a command that waits for an answer."""
+    replies["read temp"] = None
+    client = make_client(command_timeout=5)
+    poll = asyncio.create_task(client.read_state())
+    await asyncio.sleep(0.05)
+    await asyncio.wait_for(client.close(), 1)
+    with pytest.raises(AnovaConnectionError, match="closed"):
+        await poll
+    assert not client.is_connected
+
+
+async def test_closed_client_never_reconnects(mock_connect: AsyncMock) -> None:
+    """After close() every call fails and no connection is opened."""
+    client = make_client()
+    await client.read_state()
+    await client.close()
+    assert not client.is_connected
+    with pytest.raises(AnovaConnectionError, match="closed"):
+        await client.read_state()
+    assert mock_connect.call_count == 1
+
+
+async def test_cancelled_caller_during_connect(mock_connect: AsyncMock) -> None:
+    """Cancelling the caller while connecting is a real cancellation."""
+
+    async def _hang(*_args: Any, **_kwargs: Any) -> FakeBleakClient:
+        await asyncio.sleep(10)
+        raise AssertionError("not reached")
+
+    mock_connect.side_effect = _hang
+    client = make_client()
+    poll = asyncio.create_task(client.read_state())
+    await asyncio.sleep(0.02)
+    poll.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await poll
+
+
+async def test_link_drop_during_write_logs_nothing(
+    mock_connect: AsyncMock, fakes: list[FakeBleakClient]
+) -> None:
+    """A drop during a write does not leave an unretrieved future error."""
+    client = make_client()
+    await client.connect()
+    fake = fakes[0]
+
+    async def _drop_then_fail(*_args: Any, **_kwargs: Any) -> None:
+        fake.drop_link()
+        raise BleakError("Not connected")
+
+    fake.write_gatt_char = _drop_then_fail  # type: ignore[method-assign]
+    loop = asyncio.get_running_loop()
+    errors: list[dict[str, Any]] = []
+    loop.set_exception_handler(lambda _loop, context: errors.append(context))
+    try:
+        with pytest.raises(AnovaConnectionError):
+            await client.start()
+        gc.collect()
+        await asyncio.sleep(0)
+    finally:
+        loop.set_exception_handler(None)
+    assert errors == []
+
+
+async def test_idle_disconnect_error_is_swallowed(
+    mock_connect: AsyncMock, fakes: list[FakeBleakClient]
+) -> None:
+    """An unexpected error in the background disconnect is only logged."""
+    client = make_client(disconnect_delay=0.01)
+    await client.read_state()
+    fakes[0].disconnect.side_effect = RuntimeError("boom")
+    await asyncio.sleep(0.05)
     assert not client.is_connected

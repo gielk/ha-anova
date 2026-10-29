@@ -66,7 +66,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         schema=None,
         func="async_stop_cook",
     )
-    await async_register_card(hass)
+    try:
+        await async_register_card(hass)
+    except Exception:
+        # The card is optional, the cooker must work without it.
+        _LOGGER.exception("Could not register the Anova dashboard card")
     return True
 
 
@@ -105,7 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> boo
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryNotReady:
-        await client.disconnect()
+        await client.close()
         raise
 
     device_info = await _async_read_device_info(client)
@@ -113,7 +117,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> boo
 
     async def _async_close_link(_event: Event) -> None:
         """Release the cooker when Home Assistant stops."""
-        await client.disconnect()
+        await coordinator.async_shutdown()
+        await client.close()
 
     entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_close_link)
@@ -138,7 +143,12 @@ async def _async_update_listener(hass: HomeAssistant, entry: AnovaConfigEntry) -
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> bool:
-    """Unload the platforms and close the Bluetooth link."""
+    """Unload the platforms and close the Bluetooth link.
+
+    Polling stops first, so no poll can reopen the link after it was closed.
+    The client is closed for good, which also aborts a slow connect attempt.
+    """
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        await entry.runtime_data.client.disconnect()
+        await entry.runtime_data.coordinator.async_shutdown()
+        await entry.runtime_data.client.close()
     return unload_ok

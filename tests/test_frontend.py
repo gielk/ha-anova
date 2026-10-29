@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.components.http import StaticPathConfig
@@ -117,3 +119,11 @@ async def test_setup_registers_card(
 
     register_static_paths.assert_awaited_once()
     mock_add_extra_js_url.assert_called_once()
+
+
+def test_card_version_matches_manifest() -> None:
+    """Browsers cache the card for weeks, keyed by the manifest version."""
+    manifest = json.loads((CARD_PATH.parent.parent / "manifest.json").read_text())
+    match = re.search(r'CARD_VERSION = "([^"]+)"', CARD_PATH.read_text())
+    assert match is not None
+    assert match.group(1) == manifest["version"]

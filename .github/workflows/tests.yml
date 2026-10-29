@@ -36,7 +36,7 @@ jobs:
         run: pytest tests -q
 
   card:
-    name: Card syntax
+    name: Card
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,3 +45,9 @@ jobs:
           node-version: "22"
       - name: Check card JavaScript
         run: node --check custom_components/anova_ble/frontend/anova-cooker-card.js
+      - name: Install Playwright with Chromium
+        run: |
+          npm install --global playwright@1.63.0
+          npx --yes playwright@1.63.0 install --with-deps chromium
+      - name: Run card browser tests
+        run: NODE_PATH="$(npm root --global)" node tests/frontend/render.mjs

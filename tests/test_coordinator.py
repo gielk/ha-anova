@@ -174,6 +174,23 @@ async def test_backoff_grows_and_is_capped(
     assert max(intervals) == MAX_BACKOFF_INTERVAL
 
 
+async def test_backoff_survives_days_offline(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+) -> None:
+    """Thousands of failed polls do not overflow the backoff."""
+    coordinator = get_coordinator(init_integration)
+    mock_client.read_state.side_effect = AnovaConnectionError("link dropped")
+    coordinator._failures = 5000  # A cooker unplugged for weeks.
+
+    await poll(hass, freezer, coordinator)
+
+    assert not coordinator.last_update_success
+    assert coordinator.update_interval.total_seconds() == MAX_BACKOFF_INTERVAL
+
+
 async def test_recovery_resets_backoff(
     hass: HomeAssistant,
     freezer: FrozenDateTimeFactory,

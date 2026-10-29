@@ -62,7 +62,7 @@ Close the Anova app on your phone before you set up the integration. The cooker 
 ### Option 1: discovery
 
 1. Go to Settings, Devices & services.
-2. Under Discovered, click Configure on Anova Precision Cooker (Bluetooth).
+2. Under Discovered, click Add on the cooker. It is named after its Bluetooth address, for example `Anova (2D60)`.
 3. Follow the steps on the screen.
 
 ### Option 2: add it manually
@@ -198,7 +198,7 @@ To check the signal:
 
 1. Go to Settings, Devices & services, and open the Anova Precision Cooker (Bluetooth) device.
 2. Click the link to show the entities that are not shown.
-3. Enable the RSSI sensor.
+3. Enable the Signal strength sensor.
 4. Check its value after a few polls. Values closer to 0 dBm are stronger.
 
 ## Troubleshooting
@@ -209,7 +209,7 @@ The cooker accepts one Bluetooth connection at a time. Close the Anova app on yo
 
 ### Weak signal
 
-After 3 failed polls in a row, the entities become unavailable. Home Assistant then waits longer between polls, up to 5 minutes. When the signal comes back, the entities recover by themselves. No restart is needed. For a lasting fix, read [Range and signal](#range-and-signal).
+A single failed poll is ignored. Home Assistant keeps the last values and waits longer before the next poll: 30 s, then 60 s, and so on, up to 5 minutes. After 3 failed polls in a row the entities become unavailable, about 2 minutes after the first miss. When the signal comes back, the entities recover by themselves. No restart is needed. For a lasting fix, read [Range and signal](#range-and-signal).
 
 ### The cooker is not found
 

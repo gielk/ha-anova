@@ -129,7 +129,8 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState]):
         """
         self._failures += 1
         backoff = min(
-            self.poll_interval.total_seconds() * 2**self._failures,
+            # Cap the exponent: a cooker unplugged for days must not overflow.
+            self.poll_interval.total_seconds() * 2 ** min(self._failures, 10),
             MAX_BACKOFF_INTERVAL,
         )
         self.update_interval = timedelta(seconds=backoff)

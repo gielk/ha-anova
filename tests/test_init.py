@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
@@ -34,13 +34,13 @@ async def test_setup_and_unload(
     assert init_integration.state is ConfigEntryState.LOADED
     mock_client.read_state.assert_awaited_once()
     mock_client.read_device_info.assert_awaited_once()
-    mock_client.disconnect.assert_not_awaited()
+    mock_client.close.assert_not_awaited()
 
     assert await hass.config_entries.async_unload(init_integration.entry_id)
     await hass.async_block_till_done()
 
     assert init_integration.state is ConfigEntryState.NOT_LOADED
-    mock_client.disconnect.assert_awaited_once()
+    mock_client.close.assert_awaited_once()
 
 
 async def test_device_registry(
@@ -142,7 +142,7 @@ async def test_first_refresh_fails(
     assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
 
     assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    mock_client.disconnect.assert_awaited_once()
+    mock_client.close.assert_awaited_once()
     mock_client.read_device_info.assert_not_awaited()
 
 
@@ -178,4 +178,17 @@ async def test_home_assistant_stop_releases_cooker(
     hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
     await hass.async_block_till_done()
 
-    mock_client.disconnect.assert_awaited_once()
+    mock_client.close.assert_awaited_once()
+
+
+async def test_card_registration_failure_is_not_fatal(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A broken card registration only logs, the integration still loads."""
+    with patch(
+        "custom_components.anova_ble.async_register_card",
+        side_effect=RuntimeError("boom"),
+    ):
+        assert await async_setup_component(hass, DOMAIN, {})
+    assert "Could not register the Anova dashboard card" in caplog.text
+    assert hass.services.has_service(DOMAIN, SERVICE_START_COOK)
