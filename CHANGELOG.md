@@ -7,7 +7,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-10-29
+## [0.1.0] - 2026-11-04
 
 ### Added
 
@@ -18,6 +18,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 * Binary sensors for the cooking state, the timer and the connection.
 * A switched off cooker is not an error: setup always succeeds, the status shows offline, sensors keep their last known values (stored across restarts) and controls are greyed out until the cooker is back.
 * Polls start at once when the cooker is seen again.
+* Works on Home Assistant 2026.10 and 2026.11 (native climate temperature properties, install through HACS or the new Marketplace).
 * Clears the cooker's input line after connecting, which fixed "Invalid Command" answers on a real cooker.
 * Timer number entity and start and stop timer buttons.
 * Select entity to switch the cooker between Celsius and Fahrenheit.

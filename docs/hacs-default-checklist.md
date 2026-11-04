@@ -19,6 +19,11 @@ For later. Not needed for installing from a custom repository.
 
 ## Release checklist
 
+Every change that reaches `main` is released with a real version number, so
+the Marketplace and HACS show `vX.Y.Z` instead of a commit. Use semantic
+versioning: patch for fixes, minor for new features.
+
+
 1. Set the new version in `custom_components/anova_ble/manifest.json` and in `CARD_VERSION` in `custom_components/anova_ble/frontend/anova-cooker-card.js`. A test fails when they differ. Browsers cache the card by this version.
 2. In `CHANGELOG.md`, move the Unreleased entries under a new version heading with the release date. Update the compare links at the bottom.
 3. Check that the Tests and Validate workflows pass.

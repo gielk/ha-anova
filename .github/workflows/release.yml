@@ -29,7 +29,7 @@ jobs:
           import os, re
           version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
           text = open("CHANGELOG.md", encoding="utf-8").read()
-          match = re.search(rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
+          match = re.search(rf"^## \[{re.escape(version)}\].*?$(.*?)(?=^## |^\[|\Z)", text, re.M | re.S)
           notes = match.group(1).strip() if match else f"Release {version}"
           open("release_notes.md", "w", encoding="utf-8").write(notes + "\n")
           PY
