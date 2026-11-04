@@ -33,6 +33,9 @@
       },
       "timer_running": {
         "name": "Timer running"
+      },
+      "online": {
+        "name": "Connection"
       }
     },
     "button": {
@@ -72,7 +75,8 @@
           "power_loss": "Power loss",
           "running": "Running",
           "stopped": "Stopped",
-          "user_change_parameter": "Changed on the cooker"
+          "user_change_parameter": "Changed on the cooker",
+          "offline": "Offline"
         }
       },
       "target_temperature": {
@@ -87,20 +91,14 @@
     "command_failed": {
       "message": "The cooker did not accept the command: {error}"
     },
-    "device_not_found": {
-      "message": "Could not find the Anova cooker with address {address}. Make sure it is plugged in and in range of a Bluetooth adapter or proxy. {reason}"
-    },
-    "device_out_of_range": {
-      "message": "The Anova cooker {address} is out of Bluetooth range."
-    },
     "invalid_value": {
       "message": "Invalid value: {error}"
     },
     "missing_address": {
       "message": "This config entry has no Bluetooth address. Remove it and add the cooker again."
     },
-    "update_failed": {
-      "message": "Could not read the cooker: {error}"
+    "cooker_offline": {
+      "message": "The cooker is offline. Switch it on and make sure it is in range of a Bluetooth adapter or proxy."
     }
   },
   "options": {

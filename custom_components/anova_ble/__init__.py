@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 
+from bleak.backends.device import BLEDevice
 from homeassistant.components import bluetooth
-from homeassistant.components.bluetooth import BluetoothReachabilityIntent
 from homeassistant.components.climate import DOMAIN as CLIMATE_DOMAIN
 from homeassistant.const import ATTR_TEMPERATURE, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant
-from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service
 from homeassistant.helpers.typing import ConfigType
@@ -27,9 +27,16 @@ from .const import (
 )
 from .coordinator import AnovaConfigEntry, AnovaCoordinator, AnovaData
 from .frontend import async_register_card
-from .protocol import AnovaClient, AnovaDeviceInfo, AnovaError
+from .protocol import AnovaClient
+from .store import AnovaStore
 
-__all__ = ["AnovaConfigEntry", "async_setup", "async_setup_entry", "async_unload_entry"]
+__all__ = [
+    "AnovaConfigEntry",
+    "async_remove_entry",
+    "async_setup",
+    "async_setup_entry",
+    "async_unload_entry",
+]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -75,27 +82,24 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> bool:
-    """Set up a cooker from a config entry."""
+    """Set up a cooker from a config entry.
+
+    Setup never waits for the cooker: it is switched off most of the time.
+    The entities start with the last stored values and the first poll runs
+    in the background.
+    """
     address = entry.unique_id
     if address is None:
         raise ConfigEntryError(
             translation_domain=DOMAIN, translation_key="missing_address"
         )
+    store = AnovaStore(hass, entry.entry_id)
+    state, device_info = await store.async_load()
+
+    # The coordinator hands the client a fresh BLEDevice before every poll.
     ble_device = bluetooth.async_ble_device_from_address(
         hass, address, connectable=True
-    )
-    if ble_device is None:
-        raise ConfigEntryNotReady(
-            translation_domain=DOMAIN,
-            translation_key="device_not_found",
-            translation_placeholders={
-                "address": address,
-                "reason": bluetooth.async_address_reachability_diagnostics(
-                    hass, address, BluetoothReachabilityIntent.CONNECTION
-                ),
-            },
-        )
-
+    ) or BLEDevice(address, entry.title, details=None)
     connection_mode = entry.options.get(CONF_CONNECTION_MODE, DEFAULT_CONNECTION_MODE)
     client = AnovaClient(
         ble_device,
@@ -105,15 +109,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> boo
             else PER_POLL_DISCONNECT_DELAY
         ),
     )
-    coordinator = AnovaCoordinator(hass, entry, client)
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except ConfigEntryNotReady:
-        await client.close()
-        raise
-
-    device_info = await _async_read_device_info(client)
-    entry.runtime_data = AnovaData(client, coordinator, device_info)
+    coordinator = AnovaCoordinator(
+        hass, entry, client, store=store, state=state, device_info=device_info
+    )
+    entry.runtime_data = AnovaData(client, coordinator)
 
     async def _async_close_link(_event: Event) -> None:
         """Release the cooker when Home Assistant stops."""
@@ -133,16 +132,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> boo
     )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
+    entry.async_create_background_task(
+        hass, coordinator.async_refresh(), "anova_ble first poll"
+    )
     return True
-
-
-async def _async_read_device_info(client: AnovaClient) -> AnovaDeviceInfo:
-    """Read the model and firmware once. A failure only costs the model name."""
-    try:
-        return await client.read_device_info()
-    except AnovaError as err:
-        _LOGGER.debug("Could not read the device info: %s", err)
-        return AnovaDeviceInfo(id_card=None, firmware_version=None)
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: AnovaConfigEntry) -> None:
@@ -160,3 +153,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> bo
         await entry.runtime_data.coordinator.async_shutdown()
         await entry.runtime_data.client.close()
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: AnovaConfigEntry) -> None:
+    """Delete the stored last values of a removed cooker."""
+    await AnovaStore(hass, entry.entry_id).async_remove()

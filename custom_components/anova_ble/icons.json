@@ -12,6 +12,12 @@
         "state": {
           "on": "mdi:timer-sand"
         }
+      },
+      "online": {
+        "default": "mdi:bluetooth-off",
+        "state": {
+          "on": "mdi:bluetooth-connect"
+        }
       }
     },
     "button": {
@@ -49,7 +55,10 @@
         "default": "mdi:signal"
       },
       "status": {
-        "default": "mdi:state-machine"
+        "default": "mdi:state-machine",
+        "state": {
+          "offline": "mdi:power-plug-off-outline"
+        }
       },
       "target_temperature": {
         "default": "mdi:thermometer-check"

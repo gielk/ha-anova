@@ -28,6 +28,8 @@ from .protocol import AnovaState, DeviceStatus
 
 PARALLEL_UPDATES = 0
 
+STATUS_OFFLINE = "offline"
+
 
 @dataclass(frozen=True, kw_only=True)
 class AnovaSensorEntityDescription(SensorEntityDescription):
@@ -36,6 +38,8 @@ class AnovaSensorEntityDescription(SensorEntityDescription):
     value_fn: Callable[[AnovaState], StateType]
     # The native unit follows the unit the cooker is set to.
     uses_cooker_unit: bool = False
+    # Shown instead of the frozen value while the cooker is offline.
+    offline_value: StateType = None
 
 
 SENSORS: tuple[AnovaSensorEntityDescription, ...] = (
@@ -63,8 +67,9 @@ SENSORS: tuple[AnovaSensorEntityDescription, ...] = (
     AnovaSensorEntityDescription(
         key="status",
         device_class=SensorDeviceClass.ENUM,
-        options=[status.value for status in DeviceStatus],
+        options=[*(status.value for status in DeviceStatus), STATUS_OFFLINE],
         value_fn=lambda state: state.status.value if state.status else None,
+        offline_value=STATUS_OFFLINE,
     ),
 )
 
@@ -101,14 +106,19 @@ class AnovaSensor(AnovaEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit, which follows the cooker for temperatures."""
         if self.entity_description.uses_cooker_unit:
-            return HA_TEMPERATURE_UNITS[self.coordinator.data.unit]
+            return HA_TEMPERATURE_UNITS[self.cooker_unit]
         return self.entity_description.native_unit_of_measurement
 
     @property
     @override
     def native_value(self) -> StateType:
-        """Return the value of the sensor."""
-        return self.entity_description.value_fn(self.coordinator.data)
+        """Return the last known value, frozen while the cooker is offline."""
+        description = self.entity_description
+        if not self.coordinator.online and description.offline_value is not None:
+            return description.offline_value
+        if (data := self.state_data) is None:
+            return None
+        return description.value_fn(data)
 
 
 class AnovaRssiSensor(AnovaEntity, SensorEntity):

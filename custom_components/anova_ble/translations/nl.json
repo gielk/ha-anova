@@ -33,6 +33,9 @@
       },
       "timer_running": {
         "name": "Timer actief"
+      },
+      "online": {
+        "name": "Verbinding"
       }
     },
     "button": {
@@ -72,7 +75,8 @@
           "power_loss": "Stroomuitval",
           "running": "In bedrijf",
           "stopped": "Gestopt",
-          "user_change_parameter": "Gewijzigd op de stick"
+          "user_change_parameter": "Gewijzigd op de stick",
+          "offline": "Offline"
         }
       },
       "target_temperature": {
@@ -87,20 +91,14 @@
     "command_failed": {
       "message": "De sous vide stick heeft de opdracht niet geaccepteerd: {error}"
     },
-    "device_not_found": {
-      "message": "De Anova sous vide stick met adres {address} is niet gevonden. Controleer of hij is aangesloten en binnen bereik van een Bluetooth adapter of Bluetooth proxy is. {reason}"
-    },
-    "device_out_of_range": {
-      "message": "De Anova sous vide stick {address} is buiten het Bluetooth bereik."
-    },
     "invalid_value": {
       "message": "Ongeldige waarde: {error}"
     },
     "missing_address": {
       "message": "Deze integratie heeft geen Bluetooth adres. Verwijder de integratie en voeg de sous vide stick opnieuw toe."
     },
-    "update_failed": {
-      "message": "Kan de sous vide stick niet uitlezen: {error}"
+    "cooker_offline": {
+      "message": "De sous vide stick is offline. Zet hem aan en zorg dat hij binnen bereik van een Bluetooth adapter of proxy is."
     }
   },
   "options": {

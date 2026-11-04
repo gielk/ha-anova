@@ -186,6 +186,17 @@ console.log("\n[1] registration, config validation, stub config");
   check("offline: arc is empty", await page.evaluate(() =>
     document.querySelector("#c-offline anova-cooker-card").shadowRoot.querySelector('[data-el="arcFill"]').classList.contains("empty")));
 
+  eq("frozen: chips", await visibleChips(page, "frozen"), ["chipOffline"]);
+  eq("frozen: last water temperature stays visible", await text(page, "frozen", "temp"), "44.1");
+  eq("frozen: last target stays visible", await text(page, "frozen", "target"), "45.9");
+  check("frozen: root has the offline class", await page.evaluate(() =>
+    document.querySelector("#c-frozen anova-cooker-card").shadowRoot.querySelector(".root").classList.contains("offline")));
+  const frozenBtn = await page.evaluate(() => {
+    const sr = document.querySelector("#c-frozen anova-cooker-card").shadowRoot;
+    return [...sr.querySelectorAll("button")].map((b) => b.disabled);
+  });
+  check("frozen: every button is disabled", frozenBtn.length >= 6 && frozenBtn.every(Boolean), JSON.stringify(frozenBtn));
+
   eq("warning: chips (at temperature, timer inferred, warning)", await visibleChips(page, "warning"), ["chipAtTemp", "chipTimer", "chipWarn"]);
   eq("warning: chip text", await text(page, "warning", "chipWarn"), "Low water");
   eq("warning: remaining time", await text(page, "warning", "remaining"), "3 h 00 min");
@@ -491,10 +502,12 @@ console.log("\n[8] start without a preset, busy state and inline error");
   // offline card: clicks do nothing
   await clearCalls(page);
   await page.evaluate(() => { window.__fail = null; });
-  for (const name of ["main", "plus", "minus", "customBtn"]) await el(page, "offline", name).click({ force: true }).catch(() => {});
+  for (const scn of ["offline", "frozen"]) {
+    for (const name of ["main", "plus", "minus", "customBtn"]) await el(page, scn, name).click({ force: true }).catch(() => {});
+  }
   await page.locator("#c-offline [data-min='60']").click({ force: true }).catch(() => {});
   await page.waitForTimeout(1000);
-  eq("offline card never calls a service", (await calls(page)).length, 0);
+  eq("offline and frozen cards never call a service", (await calls(page)).length, 0);
   await page.context().close();
 }
 

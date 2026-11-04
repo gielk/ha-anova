@@ -102,8 +102,9 @@ A new cooker is named after the last 4 characters of its Bluetooth address, for 
 | `sensor` | `current_temperature` | Water temperature in the unit of the cooker. |
 | `sensor` | `target_temperature` | Target temperature in the unit of the cooker. |
 | `sensor` | `timer_remaining` | Minutes left on the timer. |
-| `sensor` | `status` | Cooker status, for example running or low water. |
+| `sensor` | `status` | Cooker status, for example running, low water or offline. |
 | `sensor` | `rssi` | Bluetooth signal strength in dBm. Diagnostic, disabled by default. |
+| `binary_sensor` | `online` | Connection. On while the cooker answers. |
 | `binary_sensor` | `cooking` | On while the cooker is cooking. |
 | `binary_sensor` | `timer_running` | On while the timer counts down. |
 | `number` | `timer` | Timer from 0 to 6000 minutes. Setting it sets the timer on the cooker. |
@@ -207,9 +208,16 @@ To check the signal:
 
 The cooker accepts one Bluetooth connection at a time. Close the Anova app on your phone. The integration reconnects on the next poll.
 
-### Weak signal
+### Switched off or weak signal
 
-A single failed poll is ignored. Home Assistant keeps the last values and waits longer before the next poll: 30 s, then 60 s, and so on, up to 5 minutes. After 3 failed polls in a row the entities become unavailable, about 2 minutes after the first miss. When the signal comes back, the entities recover by themselves. No restart is needed. For a lasting fix, read [Range and signal](#range-and-signal).
+A cooker that is switched off is normal, not an error. The integration loads anyway, also right after a restart of Home Assistant.
+
+* The status sensor shows `offline` and the Connection sensor turns off.
+* All sensors keep their last known values. They are stored, so they survive a restart.
+* The timer, the unit select and the buttons are greyed out while the cooker is offline.
+* When the cooker is switched on again, Home Assistant polls at once and everything updates.
+
+On a weak signal a single failed poll is ignored. After 3 failed polls in a row the cooker counts as offline. Home Assistant waits longer between tries, up to 5 minutes, until the cooker is seen again. For a lasting fix, read [Range and signal](#range-and-signal).
 
 ### The cooker is not found
 

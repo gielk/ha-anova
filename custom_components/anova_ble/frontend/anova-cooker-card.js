@@ -35,6 +35,7 @@
     stop_timer: "button",
     cooking: "binary_sensor",
     timer_running: "binary_sensor",
+    online: "binary_sensor",
     status: "sensor",
   };
 
@@ -462,7 +463,13 @@
       const lang = this._lang(h);
       const t = makeT(lang);
       const missing = !st;
-      const offline = missing || st.state === "unavailable" || st.state === "unknown";
+      // The integration keeps the last values while the cooker is switched off:
+      // the climate entity stays available and the online sensor turns off.
+      const onlineSt = S("online");
+      const statusSt = S("status");
+      const unreachable = missing || st.state === "unavailable" || st.state === "unknown";
+      const offline =
+        unreachable || (onlineSt && onlineSt.state === "off") || (statusSt && statusSt.state === "offline");
 
       // The climate state is already in HA's unit system; the attribute is only a hint.
       const unit = normUnit(a.temperature_unit || a.unit_of_measurement || a.unit) || this._unitSystem(h);
@@ -471,8 +478,9 @@
       const step = num(a.target_temp_step) || DEFAULT_STEP;
       const dec = Math.max(1, decimalsOf(step));
 
-      const current = offline ? null : num(a.current_temperature);
-      let target = offline ? null : num(a.temperature);
+      // Offline values are the last known ones, shown greyed out.
+      const current = unreachable ? null : num(a.current_temperature);
+      let target = unreachable ? null : num(a.temperature);
       // Show the value the user just picked until HA reports it back.
       const ov = this._override;
       if (ov) {
@@ -497,7 +505,7 @@
 
       // Arc: start at the minimum temperature of the cooker, full at the target.
       let progress = 0;
-      if (current !== null && target !== null && !offline) {
+      if (current !== null && target !== null) {
         progress = target > min ? clamp((current - min) / (target - min), 0, 1) : current >= target ? 1 : 0;
       }
 
@@ -513,13 +521,13 @@
           ? tRun.state === "on"
           : cooking && remaining !== null && remaining > 0;
 
-      const statusSt = S("status");
       const warn = statusSt && WARN_STATUS[statusSt.state] ? statusSt.state : null;
 
       const name = cfg.name !== undefined && cfg.name !== null ? String(cfg.name) : a.friendly_name || "";
       const tempText = fmtNum(current, 1, lang);
       const targetText = fmtNum(target, dec, lang);
-      const dialLabel = offline ? t("chip_offline") : `${t("water")}: ${tempText} ${unit}, ${t("target")}: ${targetText} ${unit}`;
+      const values = `${t("water")}: ${tempText} ${unit}, ${t("target")}: ${targetText} ${unit}`;
+      const dialLabel = offline ? (current === null ? t("chip_offline") : `${t("chip_offline")}, ${values}`) : values;
 
       return {
         t, name, unit, dec, step, min, max, missing, offline, state, cooking, progress, current, target, tempText, targetText,

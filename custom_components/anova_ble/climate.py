@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Any, override
+from typing import Any, Final, override
 
 from homeassistant.components.climate import (
     ATTR_HVAC_MODE,
@@ -15,7 +15,6 @@ from homeassistant.components.climate import (
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_TENTHS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .coordinator import AnovaConfigEntry, AnovaData
 from .entity import HA_TEMPERATURE_UNITS, AnovaEntity
@@ -26,6 +25,7 @@ PARALLEL_UPDATES = 1
 HEATING_MARGIN = 0.5
 
 _MINUTE = timedelta(minutes=1)
+UNIT_BY_HA: Final = {ha_unit: unit for unit, ha_unit in HA_TEMPERATURE_UNITS.items()}
 
 
 async def async_setup_entry(
@@ -58,43 +58,48 @@ class AnovaClimate(AnovaEntity, ClimateEntity):
     @override
     def temperature_unit(self) -> str:
         """Return the unit the cooker is set to."""
-        return HA_TEMPERATURE_UNITS[self.coordinator.data.unit]
+        return HA_TEMPERATURE_UNITS[self.cooker_unit]
 
     @property
     @override
     def min_temp(self) -> float:
         """Return the lowest target temperature in the cooker unit."""
-        return self.coordinator.data.unit.min_temperature
+        return self.cooker_unit.min_temperature
 
     @property
     @override
     def max_temp(self) -> float:
         """Return the highest target temperature in the cooker unit."""
-        return self.coordinator.data.unit.max_temperature
+        return self.cooker_unit.max_temperature
 
     @property
     @override
-    def current_temperature(self) -> float:
-        """Return the water temperature."""
-        return self.coordinator.data.current_temperature
+    def current_temperature(self) -> float | None:
+        """Return the water temperature, frozen while offline."""
+        data = self.state_data
+        return data.current_temperature if data else None
 
     @property
     @override
-    def target_temperature(self) -> float:
-        """Return the target temperature."""
-        return self.coordinator.data.target_temperature
+    def target_temperature(self) -> float | None:
+        """Return the target temperature, frozen while offline."""
+        data = self.state_data
+        return data.target_temperature if data else None
 
     @property
     @override
     def hvac_mode(self) -> HVACMode:
         """Return heat while the cooker is cooking, else off."""
-        return HVACMode.HEAT if self.coordinator.data.is_cooking else HVACMode.OFF
+        data = self.state_data
+        return HVACMode.HEAT if data and data.is_cooking else HVACMode.OFF
 
     @property
     @override
-    def hvac_action(self) -> HVACAction:
-        """Return what the heater is doing."""
-        data = self.coordinator.data
+    def hvac_action(self) -> HVACAction | None:
+        """Return what the heater is doing, None while the cooker is offline."""
+        data = self.state_data
+        if data is None or not self.coordinator.online:
+            return None
         if not data.is_cooking:
             return HVACAction.OFF
         if data.current_temperature < data.target_temperature - HEATING_MARGIN:
@@ -109,10 +114,9 @@ class AnovaClimate(AnovaEntity, ClimateEntity):
         temperature so the cooker never heats towards the old target.
         """
         if (temperature := kwargs.get(ATTR_TEMPERATURE)) is not None:
+            unit = self.cooker_unit
             await self.coordinator.async_execute(
-                self._client.set_target_temperature(
-                    temperature, unit=self.coordinator.data.unit
-                )
+                lambda: self._client.set_target_temperature(temperature, unit=unit)
             )
         if (hvac_mode := kwargs.get(ATTR_HVAC_MODE)) is not None:
             await self.async_set_hvac_mode(hvac_mode)
@@ -128,36 +132,28 @@ class AnovaClimate(AnovaEntity, ClimateEntity):
     @override
     async def async_turn_on(self) -> None:
         """Start heating."""
-        await self.coordinator.async_execute(self._client.start())
+        await self.coordinator.async_execute(self._client.start)
 
     @override
     async def async_turn_off(self) -> None:
         """Stop heating. The cooker also stops the timer."""
-        await self.coordinator.async_execute(self._client.stop())
+        await self.coordinator.async_execute(self._client.stop)
 
     async def async_start_cook(
         self, temperature: float, duration: timedelta | None = None
     ) -> None:
         """Start a cook (entity service).
 
-        ``temperature`` is in the Home Assistant unit system. It is converted
-        to the cooker unit and rounded to 0.1. ``duration`` is rounded up to
-        whole minutes.
+        ``temperature`` is in the Home Assistant unit system; the client reads
+        the cooker unit and converts. ``duration`` is rounded up to whole
+        minutes.
         """
-        unit = self.coordinator.data.unit
-        cooker_temperature = round(
-            TemperatureConverter.convert(
-                temperature,
-                self.hass.config.units.temperature_unit,
-                HA_TEMPERATURE_UNITS[unit],
-            ),
-            1,
-        )
+        unit = UNIT_BY_HA[self.hass.config.units.temperature_unit]
         minutes = None if duration is None else -((-duration) // _MINUTE)
         await self.coordinator.async_execute(
-            self._client.start_cook(cooker_temperature, minutes=minutes, unit=unit)
+            lambda: self._client.start_cook(temperature, minutes=minutes, unit=unit)
         )
 
     async def async_stop_cook(self) -> None:
         """Stop heating and the timer (entity service)."""
-        await self.coordinator.async_execute(self._client.stop())
+        await self.coordinator.async_execute(self._client.stop)

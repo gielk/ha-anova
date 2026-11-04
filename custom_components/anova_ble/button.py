@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import AnovaConfigEntry, AnovaData
-from .entity import AnovaEntity
+from .entity import AnovaControlEntity
 from .protocol import AnovaClient
 
 PARALLEL_UPDATES = 1
@@ -46,7 +46,7 @@ async def async_setup_entry(
     async_add_entities(AnovaButton(data, description) for description in BUTTONS)
 
 
-class AnovaButton(AnovaEntity, ButtonEntity):
+class AnovaButton(AnovaControlEntity, ButtonEntity):
     """A button that sends a command to the cooker."""
 
     entity_description: AnovaButtonEntityDescription
@@ -62,5 +62,5 @@ class AnovaButton(AnovaEntity, ButtonEntity):
     async def async_press(self) -> None:
         """Send the command."""
         await self.coordinator.async_execute(
-            self.entity_description.press_fn(self._client)
+            lambda: self.entity_description.press_fn(self._client)
         )

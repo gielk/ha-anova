@@ -81,18 +81,26 @@ cannot connect while Home Assistant holds it.
 
 ## Coordinator rules
 
-* `DataUpdateCoordinator[AnovaState]`, `update_interval = poll_interval`.
+The cooker is switched off most of the time. Being unreachable is normal and
+never an error: setup never fails on it and nothing is logged above INFO.
+
+* `DataUpdateCoordinator[AnovaState | None]`, `update_interval = poll_interval`.
+* Setup loads the last state and device info from `AnovaStore`
+  (`.storage/anova_ble.<entry_id>`) and never waits for the cooker. The first
+  poll runs as a background task. `async_remove_entry` deletes the store.
 * Before each poll: `bluetooth.async_ble_device_from_address(hass, address,
-  connectable=True)`. None means out of range: counts as a failed poll.
-* A failed poll keeps the last data and logs at debug level only.
-* After `FAILURES_BEFORE_UNAVAILABLE` (3) failures in a row, or when there is
-  no data yet, raise `UpdateFailed` (translated), entities go unavailable.
-  HA logs this once and logs recovery once. No other warnings.
+  connectable=True)`. None means out of range: the cooker is offline at once.
+* A failed connect or command counts as a failed poll. After
+  `FAILURES_BEFORE_OFFLINE` (3) in a row the cooker is offline.
+* A failed poll returns the last data (frozen). `UpdateFailed` is never
+  raised, so entities stay available. `coordinator.online` tells the state.
+* Going offline and coming back are logged once each at INFO. Single failed
+  polls only at DEBUG.
 * Backoff: while failing, `update_interval = min(poll_interval * 2**failures,
-  MAX_BACKOFF_INTERVAL)`. Reset to `poll_interval` on success.
-* First refresh in `async_setup_entry` via `async_config_entry_first_refresh`
-  (raises `ConfigEntryNotReady`).
-* Device info read once after the first refresh, best effort.
+  MAX_BACKOFF_INTERVAL)`. Reset to `poll_interval` on success. The first
+  advertisement after an out of range poll triggers a poll at once.
+* A successful poll saves the state (delayed write, 60 s). Device info is read
+  once after the first successful poll and written to the device registry.
 
 ## Entities
 
@@ -100,7 +108,10 @@ All entities: `_attr_has_entity_name = True`, `translation_key` as below,
 `unique_id = f"{address}_{key}"` (address from `entry.unique_id`, upper case),
 device info with `connections={(CONNECTION_BLUETOOTH, address)}`,
 manufacturer `Anova Culinary`, model from `AnovaDeviceInfo.model`,
-`sw_version` from firmware. `PARALLEL_UPDATES = 0` on read only platforms,
+`sw_version` from firmware. Sensors, binary sensors and climate show the
+last known values while offline (climate `hvac_action` is None then).
+Buttons, number and select are unavailable while offline.
+`PARALLEL_UPDATES = 0` on read only platforms,
 `1` on platforms with actions.
 
 | Platform | key / translation_key | Notes |
@@ -109,8 +120,9 @@ manufacturer `Anova Culinary`, model from `AnovaDeviceInfo.model`,
 | sensor | `current_temperature` | temperature, measurement, cooker unit |
 | sensor | `target_temperature` | temperature, cooker unit |
 | sensor | `timer_remaining` | duration, minutes |
-| sensor | `status` | enum, options = `DeviceStatus` values, None if unknown |
+| sensor | `status` | enum, options = `DeviceStatus` values plus `offline`; `offline` while the cooker is unreachable, None if unknown |
 | sensor | `rssi` | signal strength, dBm, diagnostic, disabled by default, from `bluetooth.async_last_service_info` |
+| binary_sensor | `online` | device class connectivity, on while the cooker answers |
 | binary_sensor | `cooking` | device class running |
 | binary_sensor | `timer_running` | device class running, timer counting down |
 | number | `timer` | 0 to 6000 min, step 1, box mode, duration device class, sets the timer |
@@ -140,6 +152,8 @@ Target: `entity_id` of the `anova_ble` climate entity.
 * The card finds sibling entities through `hass.entities[climate].device_id`
   and the `translation_key` of each entity on the same device
   (`timer`, `timer_remaining`, `start_timer`, `stop_timer`, `cooking`,
-  `timer_running`, `status`).
+  `timer_running`, `online`, `status`). The card counts as offline when the
+  climate entity is unavailable, `online` is off or `status` is `offline`,
+  and then shows the last values greyed out with every button disabled.
 * Actions it calls: `climate.set_temperature`, `anova_ble.start_cook`,
   `anova_ble.stop_cook`, `number.set_value` (timer), `button.press`.

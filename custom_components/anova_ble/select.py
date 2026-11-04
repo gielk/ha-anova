@@ -10,7 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import AnovaConfigEntry, AnovaData
-from .entity import AnovaEntity
+from .entity import AnovaControlEntity
 from .protocol import TemperatureUnit
 
 PARALLEL_UPDATES = 1
@@ -31,7 +31,7 @@ async def async_setup_entry(
     async_add_entities([AnovaTemperatureUnitSelect(entry.runtime_data)])
 
 
-class AnovaTemperatureUnitSelect(AnovaEntity, SelectEntity):
+class AnovaTemperatureUnitSelect(AnovaControlEntity, SelectEntity):
     """Switch the cooker between Celsius and Fahrenheit."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -43,13 +43,15 @@ class AnovaTemperatureUnitSelect(AnovaEntity, SelectEntity):
 
     @property
     @override
-    def current_option(self) -> str:
+    def current_option(self) -> str | None:
         """Return the unit the cooker is set to."""
-        return OPTION_BY_UNIT[self.coordinator.data.unit]
+        if (data := self.state_data) is None:
+            return None
+        return OPTION_BY_UNIT[data.unit]
 
     @override
     async def async_select_option(self, option: str) -> None:
         """Change the unit on the cooker."""
         await self.coordinator.async_execute(
-            self._client.set_unit(UNIT_BY_OPTION[option])
+            lambda: self._client.set_unit(UNIT_BY_OPTION[option])
         )

@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .coordinator import AnovaConfigEntry, AnovaData
-from .entity import AnovaEntity
+from .entity import AnovaControlEntity
 from .protocol import (
     TIMER_MAX_MINUTES,
     TIMER_MIN_MINUTES,
@@ -61,7 +61,7 @@ async def async_setup_entry(
     async_add_entities(AnovaNumber(data, description) for description in NUMBERS)
 
 
-class AnovaNumber(AnovaEntity, NumberEntity):
+class AnovaNumber(AnovaControlEntity, NumberEntity):
     """A number that is set on the cooker."""
 
     entity_description: AnovaNumberEntityDescription
@@ -75,13 +75,15 @@ class AnovaNumber(AnovaEntity, NumberEntity):
 
     @property
     @override
-    def native_value(self) -> float:
+    def native_value(self) -> float | None:
         """Return the value on the cooker."""
-        return self.entity_description.value_fn(self.coordinator.data)
+        if (data := self.state_data) is None:
+            return None
+        return self.entity_description.value_fn(data)
 
     @override
     async def async_set_native_value(self, value: float) -> None:
         """Send the new value to the cooker."""
         await self.coordinator.async_execute(
-            self.entity_description.set_fn(self._client, value)
+            lambda: self.entity_description.set_fn(self._client, value)
         )

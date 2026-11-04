@@ -28,7 +28,12 @@ async def async_get_config_entry_diagnostics(
     return {
         "entry": {"data": dict(entry.data), "options": dict(entry.options)},
         "state": asdict(coordinator.data) if coordinator.data else None,
-        "device_info": async_redact_data(asdict(data.device_info), TO_REDACT),
+        "device_info": (
+            async_redact_data(asdict(coordinator.device_info), TO_REDACT)
+            if coordinator.device_info
+            else None
+        ),
+        "online": coordinator.online,
         "last_update_success": coordinator.last_update_success,
         "failures": coordinator.failures,
         "update_interval": update_interval.total_seconds() if update_interval else None,

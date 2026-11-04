@@ -148,6 +148,8 @@ const SCENARIOS = {
   cooking: { climate: "heat", current: 54.2, target: 56.5, cooking: "on", timerSet: 120, remaining: 65, status: "running", running: true },
   off: { climate: "off", current: 23.4, target: 56.5, cooking: "off", timerSet: 0, remaining: 0, status: "stopped", running: false },
   offline: { climate: "unavailable" },
+  // cooker switched off: the integration keeps the last values, the online sensor is off
+  frozen: { climate: "off", current: 44.1, target: 45.9, cooking: "off", timerSet: 0, remaining: 0, status: "offline", running: false, online: "off" },
   // at temperature, status warning, no timer_running entity: the card infers it from cooking + time left
   warning: { climate: "heat", current: 56.4, target: 56.5, cooking: "on", timerSet: 240, remaining: 180, status: "low_water" },
 };
@@ -167,6 +169,7 @@ function buildHass(name, s) {
     "button.anova_stop_timer": mk("button.anova_stop_timer", unavailable ? "unavailable" : "unknown"),
     "binary_sensor.anova_cooking": mk("binary_sensor.anova_cooking", unavailable ? "unavailable" : s.cooking),
     "sensor.anova_status": mk("sensor.anova_status", unavailable ? "unavailable" : s.status),
+    "binary_sensor.anova_online": mk("binary_sensor.anova_online", unavailable ? "unavailable" : s.online || "on"),
     // decoys: another climate from another platform, and anova entities of another device
     "climate.other": mk("climate.other", "heat", { current_temperature: 1, temperature: 2 }),
     "button.other_start_timer": mk("button.other_start_timer", "unknown"),
@@ -183,6 +186,7 @@ function buildHass(name, s) {
     "button.anova_stop_timer": reg("anova_ble", DEVICE, "stop_timer"),
     "binary_sensor.anova_cooking": reg("anova_ble", DEVICE, "cooking"),
     "sensor.anova_status": reg("anova_ble", DEVICE, "status"),
+    "binary_sensor.anova_online": reg("anova_ble", DEVICE, "online"),
   };
   if (s.running !== undefined || unavailable) {
     states["binary_sensor.anova_timer_running"] = mk("binary_sensor.anova_timer_running",
@@ -264,7 +268,8 @@ function mount() {
     scn.card = card;
     card.setConfig({ type: "custom:anova-cooker-card", entity: "climate.anova" });   // HA order: config first
     cell.appendChild(card);
-    stage.appendChild(cell);
+    // the frozen card stays out of the README screenshots
+    (name === "frozen" ? document.getElementById("editor-host") : stage).appendChild(cell);
     card.hass = scn.hass;
     window.__scn[name] = scn;
   }

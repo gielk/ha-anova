@@ -50,7 +50,10 @@ async def async_setup_entry(
     """Set up the binary sensors."""
     data = entry.runtime_data
     async_add_entities(
-        AnovaBinarySensor(data, description) for description in BINARY_SENSORS
+        [
+            *(AnovaBinarySensor(data, description) for description in BINARY_SENSORS),
+            AnovaOnlineBinarySensor(data),
+        ]
     )
 
 
@@ -68,6 +71,24 @@ class AnovaBinarySensor(AnovaEntity, BinarySensorEntity):
 
     @property
     @override
+    def is_on(self) -> bool | None:
+        """Return the last known value, frozen while the cooker is offline."""
+        if (data := self.state_data) is None:
+            return None
+        return self.entity_description.value_fn(data)
+
+
+class AnovaOnlineBinarySensor(AnovaEntity, BinarySensorEntity):
+    """On while the cooker answers, off while it is switched off or away."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+
+    def __init__(self, data: AnovaData) -> None:
+        """Initialize the connection sensor."""
+        super().__init__(data, "online")
+
+    @property
+    @override
     def is_on(self) -> bool:
-        """Return the value for the last poll."""
-        return self.entity_description.value_fn(self.coordinator.data)
+        """Return True while the cooker answers."""
+        return self.coordinator.online

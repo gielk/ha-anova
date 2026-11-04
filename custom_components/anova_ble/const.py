@@ -19,9 +19,9 @@ MIN_POLL_INTERVAL: Final = 5
 MAX_POLL_INTERVAL: Final = 300
 DEFAULT_CONNECTION_MODE: Final = CONNECTION_MODE_PER_POLL
 
-# Polls fail often on a weak link. Keep the last data until this many
-# consecutive polls failed, then mark the entities unavailable.
-FAILURES_BEFORE_UNAVAILABLE: Final = 3
+# Polls fail now and then on a weak link. The cooker counts as offline after
+# this many failed polls in a row (at once when Bluetooth cannot see it).
+FAILURES_BEFORE_OFFLINE: Final = 3
 # Poll interval backoff cap while the cooker cannot be reached.
 MAX_BACKOFF_INTERVAL: Final = 300
 # In per poll mode the link closes this many seconds after the last command.
