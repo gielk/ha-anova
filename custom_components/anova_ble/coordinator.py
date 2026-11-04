@@ -215,8 +215,8 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState | None]):
             return
         self.device_info = info
         registry = dr.async_get(self.hass)
-        device = registry.async_get_device(
-            connections={(dr.CONNECTION_BLUETOOTH, self.address)}
+        device = registry.async_get_device_by_connection(
+            (dr.CONNECTION_BLUETOOTH, self.address), self.config_entry.entry_id
         )
         if device is not None:
             registry.async_update_device(

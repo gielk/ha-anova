@@ -133,6 +133,7 @@ async def test_unique_ids(
         ("sensor", "rssi"),
         ("binary_sensor", "cooking"),
         ("binary_sensor", "timer_running"),
+        ("binary_sensor", "online"),
         ("number", "timer"),
         ("button", "start_timer"),
         ("button", "stop_timer"),
@@ -203,13 +204,17 @@ async def test_states(
 
     status = hass.states.get(entity_id(entity_registry, SENSOR_DOMAIN, "status"))
     assert status.state == "running"
-    assert status.attributes["options"] == [s.value for s in DeviceStatus]
+    assert status.attributes["options"] == [s.value for s in DeviceStatus] + ["offline"]
 
     cooking = hass.states.get(
         entity_id(entity_registry, BINARY_SENSOR_DOMAIN, "cooking")
     )
     assert cooking.state == STATE_ON
     assert cooking.attributes["device_class"] == "running"
+
+    online = hass.states.get(entity_id(entity_registry, BINARY_SENSOR_DOMAIN, "online"))
+    assert online.state == STATE_ON
+    assert online.attributes["device_class"] == "connectivity"
 
     timer = hass.states.get(entity_id(entity_registry, NUMBER_DOMAIN, "timer"))
     assert timer.state == "90"
@@ -561,6 +566,52 @@ async def test_action_requests_refresh(
     assert mock_client.read_state.await_count == 2
 
 
+async def test_action_while_offline_fails_without_calling_the_client(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_ble_device: MagicMock,
+) -> None:
+    """A cooker Bluetooth cannot see fails at once with a translated error."""
+    mock_ble_device.return_value = None
+
+    with pytest.raises(HomeAssistantError) as exc_info:
+        await hass.services.async_call(
+            CLIMATE_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: CLIMATE_ID},
+            blocking=True,
+        )
+
+    assert not isinstance(exc_info.value, ServiceValidationError)
+    assert exc_info.value.translation_domain == DOMAIN
+    assert exc_info.value.translation_key == "cooker_offline"
+    mock_client.stop.assert_not_awaited()
+    assert mock_client.read_state.await_count == 1
+
+
+async def test_action_success_marks_cooker_online(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    mock_ble_device: MagicMock,
+    ble_device: MagicMock,
+) -> None:
+    """A command that went through proves the cooker is there."""
+    coordinator = init_integration.runtime_data.coordinator
+    mock_ble_device.return_value = None
+    await coordinator.async_refresh()
+    assert not coordinator.online
+
+    mock_ble_device.return_value = ble_device
+    await hass.services.async_call(
+        CLIMATE_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: CLIMATE_ID}, blocking=True
+    )
+
+    mock_client.stop.assert_awaited_once_with()
+    assert coordinator.online
+
+
 async def test_failed_action_does_not_refresh(
     hass: HomeAssistant, init_integration: MockConfigEntry, mock_client: MagicMock
 ) -> None:
@@ -641,31 +692,26 @@ async def test_start_cook_duration_rounds_up(
 
 
 @pytest.mark.parametrize(
-    ("units", "state", "temperature", "expected", "unit"),
+    ("units", "state", "unit"),
     [
-        # Home Assistant in °F, cooker in °C: 133.7 °F is 56.5 °C.
-        (US_CUSTOMARY_SYSTEM, None, 133.7, 56.5, TemperatureUnit.CELSIUS),
-        # Rounded to 0.1: 135 °F is 57.22 °C.
-        (US_CUSTOMARY_SYSTEM, None, 135, 57.2, TemperatureUnit.CELSIUS),
-        # Home Assistant in °C, cooker in °F: 56.5 °C is 133.7 °F.
-        (METRIC_SYSTEM, FAHRENHEIT, 56.5, 133.7, TemperatureUnit.FAHRENHEIT),
-        # Same unit: untouched.
-        (US_CUSTOMARY_SYSTEM, FAHRENHEIT, 140, 140.0, TemperatureUnit.FAHRENHEIT),
-        (METRIC_SYSTEM, None, 56.5, 56.5, TemperatureUnit.CELSIUS),
+        # The client converts, so the temperature is passed on as given and only
+        # the unit of the Home Assistant unit system is added.
+        (US_CUSTOMARY_SYSTEM, None, TemperatureUnit.FAHRENHEIT),
+        (US_CUSTOMARY_SYSTEM, FAHRENHEIT, TemperatureUnit.FAHRENHEIT),
+        (METRIC_SYSTEM, FAHRENHEIT, TemperatureUnit.CELSIUS),
+        (METRIC_SYSTEM, None, TemperatureUnit.CELSIUS),
     ],
 )
-async def test_start_cook_converts_temperature(
+async def test_start_cook_passes_temperature_and_unit(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_client: MagicMock,
     mock_ble_device: MagicMock,
     units: object,
     state: AnovaState | None,
-    temperature: float,
-    expected: float,
     unit: TemperatureUnit,
 ) -> None:
-    """The temperature is given in the Home Assistant unit and converted."""
+    """The temperature is given in the Home Assistant unit and left to the client."""
     if state is not None:
         mock_client.read_state.return_value = state
     hass.config.units = units
@@ -673,9 +719,9 @@ async def test_start_cook_converts_temperature(
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
-    await start_cook(hass, temperature=temperature, duration="00:10:00")
+    await start_cook(hass, temperature=133.7, duration="00:10:00")
 
-    mock_client.start_cook.assert_awaited_once_with(expected, minutes=10, unit=unit)
+    mock_client.start_cook.assert_awaited_once_with(133.7, minutes=10, unit=unit)
 
 
 async def test_stop_cook(

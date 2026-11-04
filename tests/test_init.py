@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
 from unittest.mock import MagicMock, patch
 
+from bleak.backends.device import BLEDevice
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
@@ -11,7 +15,10 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH
 from homeassistant.setup import async_setup_component
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.anova_ble.const import (
     CONF_CONNECTION_MODE,
@@ -21,10 +28,17 @@ from custom_components.anova_ble.const import (
 )
 from custom_components.anova_ble.protocol import (
     AnovaConnectionError,
+    AnovaState,
     AnovaTimeoutError,
 )
+from custom_components.anova_ble.store import SAVE_DELAY
 
-from .const import ADDRESS
+from .const import ADDRESS, TITLE
+
+
+def store_key(entry: MockConfigEntry) -> str:
+    """Return the storage key of the last values of an entry."""
+    return f"{DOMAIN}.{entry.entry_id}"
 
 
 async def test_setup_and_unload(
@@ -117,16 +131,24 @@ async def test_device_not_found(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_client_cls: MagicMock,
+    mock_client: MagicMock,
     mock_ble_device: MagicMock,
 ) -> None:
-    """Setup is retried while the cooker is out of range."""
+    """A cooker that is switched off does not stop the entry from loading."""
     mock_ble_device.return_value = None
     mock_config_entry.add_to_hass(hass)
 
-    assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
 
-    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    mock_client_cls.assert_not_called()
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    # The client gets a placeholder that the coordinator replaces later.
+    (device,) = mock_client_cls.call_args.args
+    assert isinstance(device, BLEDevice)
+    assert device.address == ADDRESS
+    assert device.name == TITLE
+    mock_client.read_state.assert_not_awaited()
+    assert not mock_config_entry.runtime_data.coordinator.online
 
 
 async def test_first_refresh_fails(
@@ -135,32 +157,85 @@ async def test_first_refresh_fails(
     mock_client: MagicMock,
     mock_ble_device: MagicMock,
 ) -> None:
-    """Setup is retried when the cooker does not answer, and the link is closed."""
+    """A cooker that does not answer does not stop the entry from loading."""
     mock_client.read_state.side_effect = AnovaConnectionError("link dropped")
     mock_config_entry.add_to_hass(hass)
 
-    assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
 
-    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    mock_client.close.assert_awaited_once()
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    mock_client.read_state.assert_awaited_once()
     mock_client.read_device_info.assert_not_awaited()
+    mock_client.close.assert_not_awaited()
+    coordinator = mock_config_entry.runtime_data.coordinator
+    assert coordinator.last_update_success
+    assert not coordinator.online
 
 
-async def test_first_refresh_out_of_range_between_lookups(
+async def test_first_poll_runs_in_the_background(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_client: MagicMock,
     mock_ble_device: MagicMock,
-    ble_device: MagicMock,
 ) -> None:
-    """A cooker that vanishes before the first poll also means retry."""
-    mock_ble_device.side_effect = [ble_device, None]
+    """Setup does not wait for the first poll."""
+    release = asyncio.Event()
+    state = mock_client.read_state.return_value
+
+    async def slow_read_state() -> AnovaState:
+        await release.wait()
+        return state
+
+    mock_client.read_state.side_effect = slow_read_state
     mock_config_entry.add_to_hass(hass)
 
-    assert not await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
 
-    assert mock_config_entry.state is ConfigEntryState.SETUP_RETRY
-    mock_client.read_state.assert_not_awaited()
+    assert mock_config_entry.state is ConfigEntryState.LOADED
+    coordinator = mock_config_entry.runtime_data.coordinator
+    assert not coordinator.online
+    assert coordinator.data is None
+
+    release.set()
+    await hass.async_block_till_done()
+
+    assert coordinator.online
+    assert coordinator.data == state
+
+
+async def test_missing_address(hass: HomeAssistant, mock_client_cls: MagicMock) -> None:
+    """An entry without a unique id cannot be set up."""
+    entry = MockConfigEntry(domain=DOMAIN, title=TITLE, data={})
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert entry.reason is not None
+    assert "no Bluetooth address" in entry.reason
+    mock_client_cls.assert_not_called()
+
+
+async def test_remove_entry_deletes_the_store(
+    hass: HomeAssistant,
+    hass_storage: dict[str, Any],
+    freezer: FrozenDateTimeFactory,
+    init_integration: MockConfigEntry,
+    mock_ble_device: MagicMock,
+) -> None:
+    """Removing the cooker deletes the stored values."""
+    key = store_key(init_integration)
+    mock_ble_device.return_value = None  # No further polls push the save back.
+    freezer.tick(SAVE_DELAY + 1)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert key in hass_storage
+
+    assert await hass.config_entries.async_remove(init_integration.entry_id)
+    await hass.async_block_till_done()
+
+    assert key not in hass_storage
 
 
 async def test_services_registered(hass: HomeAssistant) -> None:

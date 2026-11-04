@@ -17,7 +17,7 @@ ICONS = json.loads((INTEGRATION / "icons.json").read_text())
 SERVICES = yaml.safe_load((INTEGRATION / "services.yaml").read_text())
 
 ENTITIES = {
-    "binary_sensor": ["cooking", "timer_running"],
+    "binary_sensor": ["cooking", "online", "timer_running"],
     "button": ["start_timer", "stop_timer"],
     "climate": ["cooker"],
     "number": ["timer"],
@@ -75,7 +75,7 @@ def test_entity_has_icon_and_name(platform: str, key: str) -> None:
 def test_enum_states_are_translated() -> None:
     """Every status and every unit option has a translated state."""
     states = STRINGS["entity"]["sensor"]["status"]["state"]
-    assert set(states) == {status.value for status in DeviceStatus}
+    assert set(states) == {status.value for status in DeviceStatus} | {"offline"}
     units = STRINGS["entity"]["select"]["temperature_unit"]["state"]
     assert set(units) == {"celsius", "fahrenheit"}
     assert set(ICONS["entity"]["select"]["temperature_unit"]["state"]) == set(units)
@@ -83,12 +83,17 @@ def test_enum_states_are_translated() -> None:
 
 def test_exception_keys_in_code_are_translated() -> None:
     """Every translation key used for an exception exists in strings.json."""
-    used = {"update_failed", "device_out_of_range"}  # Passed on by the coordinator.
+    used: set[str] = set()
     for path in INTEGRATION.glob("*.py"):
         used |= set(re.findall(r'translation_key="(\w+)"', path.read_text()))
 
-    assert {"command_failed", "invalid_value", "device_not_found"} <= used
-    assert used <= set(STRINGS["exceptions"])
+    assert {
+        "command_failed",
+        "cooker_offline",
+        "invalid_value",
+        "missing_address",
+    } <= used
+    assert set(STRINGS["exceptions"]) == used
     for key in used:
         assert STRINGS["exceptions"][key]["message"]
 
