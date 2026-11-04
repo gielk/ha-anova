@@ -42,11 +42,23 @@ Not supported yet:
 
 Requires Home Assistant 2026.10.0 or newer.
 
-Click this button if you use My Home Assistant. It opens HACS and adds this repository.
+Click this button if you use My Home Assistant. It opens this repository in the Marketplace (Home Assistant 2026.11 and newer) or in HACS (2026.10).
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gielk&repository=ha-anova&category=integration)
 
-To install by hand:
+### Home Assistant 2026.11 and newer (Marketplace)
+
+Since 2026.11 HACS is built into Home Assistant as the Marketplace.
+
+1. Go to Settings, Marketplace. Accept the first run notice if it shows.
+2. Connect your GitHub account in the Marketplace. It is needed to add a repository from a link.
+3. Choose Add from link and enter `https://github.com/gielk/ha-anova`. Choose Integration as the type.
+4. Download Anova Precision Cooker (Bluetooth).
+5. Restart Home Assistant.
+
+Updates then show up under Settings, Updates.
+
+### Home Assistant 2026.10 (HACS)
 
 1. Open HACS in Home Assistant.
 2. Click the three dots in the top right corner.
@@ -276,11 +288,17 @@ Anova stopte de ondersteuning voor de app van de originele Bluetooth en Bluetoot
 
 ### Installeren in 5 stappen
 
-1. Open HACS. Klik rechtsboven op de drie puntjes en kies Aangepaste repositories.
-2. Vul als URL in: https://github.com/gielk/ha-anova. Kies als type Integratie en klik op Toevoegen.
-3. Zoek naar Anova Precision Cooker (Bluetooth) en klik op Downloaden.
+Vanaf Home Assistant 2026.11 heet HACS de Marketplace en zit het in Home Assistant zelf.
+
+1. Ga naar Instellingen, Marketplace. Accepteer de melding en koppel je GitHub account.
+2. Kies Toevoegen via link en vul in: https://github.com/gielk/ha-anova. Kies als type Integratie.
+3. Download Anova Precision Cooker (Bluetooth).
 4. Start Home Assistant opnieuw.
 5. Sluit de Anova app op je telefoon. Ga naar Instellingen, Apparaten en diensten en voeg de integratie toe. Bij Ontdekt verschijnt de sous vide stick meestal vanzelf.
+
+Op Home Assistant 2026.10 gaat het via HACS: drie puntjes, Aangepaste repositories, dezelfde URL, type Integratie.
+
+Updates zie je daarna onder Instellingen, Updates.
 
 ### Problemen oplossen
 
