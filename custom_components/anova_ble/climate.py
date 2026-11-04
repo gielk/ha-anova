@@ -55,8 +55,7 @@ class AnovaClimate(AnovaEntity, ClimateEntity):
         self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
 
     @property
-    @override
-    def temperature_unit(self) -> str:
+    def native_temperature_unit(self) -> str:
         """Return the unit the cooker is set to."""
         return HA_TEMPERATURE_UNITS[self.cooker_unit]
 
@@ -73,18 +72,22 @@ class AnovaClimate(AnovaEntity, ClimateEntity):
         return self.cooker_unit.max_temperature
 
     @property
-    @override
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Return the water temperature, frozen while offline."""
         data = self.state_data
         return data.current_temperature if data else None
 
     @property
-    @override
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Return the target temperature, frozen while offline."""
         data = self.state_data
         return data.target_temperature if data else None
+
+    # Home Assistant 2026.11 renamed these to native_*. Older releases still
+    # read the old names; when a class provides both, 2026.11 uses native_*.
+    temperature_unit = native_temperature_unit
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     @override
