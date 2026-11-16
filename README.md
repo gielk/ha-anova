@@ -30,7 +30,7 @@ Not supported yet:
 
 * Climate entity to set the target temperature and to turn heating on or off.
 * Sensors for current temperature, target temperature, timer, status and signal strength.
-* Binary sensor that shows when the cooker is cooking.
+* Binary sensors for cooking, timer running and the connection.
 * Timer number and start and stop timer buttons.
 * Select to switch the cooker between Celsius and Fahrenheit.
 * Actions `anova_ble.start_cook` and `anova_ble.stop_cook`.
@@ -69,7 +69,7 @@ Updates then show up under Settings, Updates.
 
 ## Set up
 
-Close the Anova app on your phone before you set up the integration. The cooker accepts only one Bluetooth connection. If the phone holds the connection, Home Assistant cannot reach the cooker.
+The cooker accepts only one Bluetooth connection. Before you set up the integration, close any other app that is connected to the cooker. If another app holds the connection, Home Assistant cannot reach the cooker.
 
 ### Option 1: discovery
 
@@ -97,12 +97,14 @@ Go to Settings, Devices & services, Anova Precision Cooker (Bluetooth), and clic
 | Option | Default | Allowed values | What it does |
 | --- | --- | --- | --- |
 | Poll interval | 15 seconds | 5 to 300 seconds | How often Home Assistant reads the cooker. |
-| Connection mode | Per poll | Per poll or keep connected | How the Bluetooth link is handled. See below. |
+| Connection mode | Keep connected | Keep connected or per poll | How the Bluetooth link is handled. See below. |
 
 Connection modes:
 
-* **Per poll** (default): Home Assistant connects, reads the cooker, and disconnects again. Other apps can connect in between. The trade off is one reconnect for every poll.
-* **Keep connected**: Home Assistant holds one connection open. Updates are faster and there are fewer reconnects. The trade off is that the phone app cannot connect while Home Assistant holds the link.
+* **Keep connected** (default): Home Assistant holds one connection open while the cooker is on. Updates are fast and reliable. The trade off is that no other app can connect while Home Assistant holds the link.
+* **Per poll**: Home Assistant connects, reads the cooker, and disconnects again. Another app can connect in between. The trade off is one reconnect for every poll, which fails more often on a weak signal.
+
+Up to version 0.1.0 the default was per poll. If you never saved the options, the cooker switches to keep connected when you update.
 
 ## Entities
 
@@ -216,9 +218,9 @@ To check the signal:
 
 ## Troubleshooting
 
-### The phone app holds the connection
+### Another app holds the connection
 
-The cooker accepts one Bluetooth connection at a time. Close the Anova app on your phone. The integration reconnects on the next poll.
+The cooker accepts one Bluetooth connection at a time. Close any other app that is connected to the cooker. The integration reconnects on the next poll.
 
 ### Switched off or weak signal
 
@@ -229,12 +231,12 @@ A cooker that is switched off is normal, not an error. The integration loads any
 * The timer, the unit select and the buttons are greyed out while the cooker is offline.
 * When the cooker is switched on again, Home Assistant polls at once and everything updates.
 
-On a weak signal a single failed poll is ignored. After 3 failed polls in a row the cooker counts as offline. Home Assistant waits longer between tries, up to 5 minutes, until the cooker is seen again. For a lasting fix, read [Range and signal](#range-and-signal).
+On a weak signal a single failed poll is ignored. After 3 failed polls in a row the cooker counts as offline. Home Assistant then waits longer between tries. While Bluetooth still sees the cooker it tries again at least once a minute. When Bluetooth cannot see the cooker at all, the wait grows to 5 minutes until the cooker is seen again. For a lasting fix, read [Range and signal](#range-and-signal).
 
 ### The cooker is not found
 
 1. Unplug the cooker, wait a few seconds, and plug it in again.
-2. Close the Anova app on your phone.
+2. Close any other app that is connected to the cooker.
 3. Go to Settings, Devices & services and open the Bluetooth integration. Check that your Bluetooth adapter or ESPHome proxy is listed there.
 4. Move the cooker closer to the adapter or proxy and try again.
 
@@ -294,7 +296,7 @@ Vanaf Home Assistant 2026.11 heet HACS de Marketplace en zit het in Home Assista
 2. Kies Toevoegen via link en vul in: https://github.com/gielk/ha-anova. Kies als type Integratie.
 3. Download Anova Precision Cooker (Bluetooth).
 4. Start Home Assistant opnieuw.
-5. Sluit de Anova app op je telefoon. Ga naar Instellingen, Apparaten en diensten en voeg de integratie toe. Bij Ontdekt verschijnt de sous vide stick meestal vanzelf.
+5. Sluit andere apps die met de sous vide stick verbonden zijn. Ga naar Instellingen, Apparaten en diensten en voeg de integratie toe. Bij Ontdekt verschijnt de sous vide stick meestal vanzelf.
 
 Op Home Assistant 2026.10 gaat het via HACS: drie puntjes, Aangepaste repositories, dezelfde URL, type Integratie.
 
@@ -302,6 +304,6 @@ Updates zie je daarna onder Instellingen, Updates.
 
 ### Problemen oplossen
 
-1. **De sous vide stick wordt niet gevonden.** Sluit de Anova app op je telefoon. Haal de stekker van de stick even uit het stopcontact en steek hem er weer in. Controleer of je Bluetooth adapter of ESPHome proxy werkt in de Bluetooth integratie.
-2. **Het signaal is zwak.** De entiteiten worden onbeschikbaar, maar komen vanzelf weer terug. Zet de stick dichterbij, of plaats een ESPHome Bluetooth proxy in de keuken.
+1. **De sous vide stick wordt niet gevonden.** Sluit andere apps die met de sous vide stick verbonden zijn. Haal de stekker van de stick even uit het stopcontact en steek hem er weer in. Controleer of je Bluetooth adapter of ESPHome proxy werkt in de Bluetooth integratie.
+2. **Het signaal is zwak of de stick staat uit.** De status wordt offline en de knoppen worden grijs. De sensoren houden hun laatste waarde. Alles komt vanzelf weer terug zodra de stick bereikbaar is. Zet de stick dichterbij, of plaats een ESPHome Bluetooth proxy in de keuken.
 3. **Je wilt meer informatie.** Zet debug logging aan voor custom_components.anova_ble. Download daarna de diagnostics via de drie puntjes op de integratiepagina. Controleer het bestand voordat je het deelt.

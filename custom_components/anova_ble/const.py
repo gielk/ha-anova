@@ -12,18 +12,21 @@ CONF_CONNECTION_MODE: Final = "connection_mode"
 
 CONNECTION_MODE_PER_POLL: Final = "per_poll"
 CONNECTION_MODE_PERSISTENT: Final = "persistent"
-CONNECTION_MODES: Final = [CONNECTION_MODE_PER_POLL, CONNECTION_MODE_PERSISTENT]
+CONNECTION_MODES: Final = [CONNECTION_MODE_PERSISTENT, CONNECTION_MODE_PER_POLL]
 
 DEFAULT_POLL_INTERVAL: Final = 15
 MIN_POLL_INTERVAL: Final = 5
 MAX_POLL_INTERVAL: Final = 300
-DEFAULT_CONNECTION_MODE: Final = CONNECTION_MODE_PER_POLL
+DEFAULT_CONNECTION_MODE: Final = CONNECTION_MODE_PERSISTENT
 
 # Polls fail now and then on a weak link. The cooker counts as offline after
 # this many failed polls in a row (at once when Bluetooth cannot see it).
 FAILURES_BEFORE_OFFLINE: Final = 3
 # Poll interval backoff cap while the cooker cannot be reached.
 MAX_BACKOFF_INTERVAL: Final = 300
+# Lower cap while Bluetooth still sees the cooker but connecting fails, for
+# example on a weak signal: no advertisement will bring the next poll forward.
+MAX_BACKOFF_INTERVAL_VISIBLE: Final = 60
 # In per poll mode the link closes this many seconds after the last command.
 PER_POLL_DISCONNECT_DELAY: Final = 2.0
 # Minimum time between two refreshes requested after an action.

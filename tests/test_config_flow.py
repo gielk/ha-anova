@@ -235,7 +235,7 @@ async def test_options_flow(
     # The form starts with the defaults.
     assert result["data_schema"]({}) == {
         CONF_POLL_INTERVAL: 15,
-        CONF_CONNECTION_MODE: "per_poll",
+        CONF_CONNECTION_MODE: CONNECTION_MODE_PERSISTENT,
     }
     mock_client_cls.reset_mock()
 
@@ -243,7 +243,7 @@ async def test_options_flow(
         result["flow_id"],
         user_input={
             CONF_POLL_INTERVAL: 30.0,
-            CONF_CONNECTION_MODE: CONNECTION_MODE_PERSISTENT,
+            CONF_CONNECTION_MODE: "per_poll",
         },
     )
     await hass.async_block_till_done()
@@ -251,11 +251,11 @@ async def test_options_flow(
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"] == {
         CONF_POLL_INTERVAL: 30,
-        CONF_CONNECTION_MODE: CONNECTION_MODE_PERSISTENT,
+        CONF_CONNECTION_MODE: "per_poll",
     }
     assert isinstance(init_integration.options[CONF_POLL_INTERVAL], int)
     # The entry was reloaded with the new connection mode.
-    assert mock_client_cls.call_args.kwargs["disconnect_delay"] is None
+    assert mock_client_cls.call_args.kwargs["disconnect_delay"] == 2.0
     coordinator = init_integration.runtime_data.coordinator
     assert coordinator.update_interval.total_seconds() == 30
 

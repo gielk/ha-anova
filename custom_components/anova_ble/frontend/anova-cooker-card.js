@@ -10,7 +10,7 @@
 (() => {
   "use strict"; // also keeps this safe when the file is loaded as a classic script twice
 
-  const CARD_VERSION = "0.1.0";
+  const CARD_VERSION = "0.2.0";
   const CARD_TAG = "anova-cooker-card";
   const EDITOR_TAG = "anova-cooker-card-editor";
   const PLATFORM = "anova_ble";

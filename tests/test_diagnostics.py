@@ -55,7 +55,7 @@ async def test_diagnostics(
         "last_update_success": True,
         "failures": 0,
         "update_interval": 15.0,
-        "connection_mode": "per_poll",
+        "connection_mode": "persistent",
         "connected": True,
         "bluetooth": {
             "name": "Anova",

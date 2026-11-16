@@ -3,17 +3,17 @@
     "abort": {
       "already_configured": "Deze sous vide stick is al ingesteld.",
       "already_in_progress": "Het instellen van deze sous vide stick is al bezig.",
-      "no_devices_found": "Geen Anova sous vide sticks gevonden. Controleer of de sous vide stick is aangesloten en binnen bereik van een Bluetooth adapter of Bluetooth proxy is, en sluit de Anova app op je telefoon.",
+      "no_devices_found": "Geen Anova sous vide sticks gevonden. Controleer of de sous vide stick is aangesloten en binnen bereik van een Bluetooth adapter of Bluetooth proxy is, en sluit andere apps die met de sous vide stick verbonden zijn.",
       "not_supported": "Dit apparaat is geen ondersteunde Anova Precision Cooker."
     },
     "error": {
-      "cannot_connect": "Kan geen verbinding maken met de sous vide stick. Sluit de Anova app op je telefoon, verplaats de sous vide stick dichter bij de Bluetooth adapter of Bluetooth proxy en probeer het opnieuw.",
+      "cannot_connect": "Kan geen verbinding maken met de sous vide stick. Sluit andere apps die met de sous vide stick verbonden zijn, verplaats de sous vide stick dichter bij de Bluetooth adapter of Bluetooth proxy en probeer het opnieuw.",
       "unknown": "Onverwachte fout. Bekijk de logboeken voor meer details."
     },
     "flow_title": "{name}",
     "step": {
       "bluetooth_confirm": {
-        "description": "Wil je {name} instellen? Sluit eerst de Anova app op je telefoon. De sous vide stick accepteert maar één Bluetooth verbinding tegelijk."
+        "description": "Wil je {name} instellen? Sluit eerst andere apps die met de sous vide stick verbonden zijn. De sous vide stick accepteert maar één Bluetooth verbinding tegelijk."
       },
       "user": {
         "data": {
@@ -22,7 +22,7 @@
         "data_description": {
           "address": "De Anova sous vide sticks die via Bluetooth zijn gevonden."
         },
-        "description": "Kies de sous vide stick die je wilt instellen. Sluit eerst de Anova app op je telefoon. De sous vide stick accepteert maar één Bluetooth verbinding tegelijk."
+        "description": "Kies de sous vide stick die je wilt instellen. Sluit eerst andere apps die met de sous vide stick verbonden zijn. De sous vide stick accepteert maar één Bluetooth verbinding tegelijk."
       }
     }
   },
@@ -109,7 +109,7 @@
           "poll_interval": "Ophaalinterval"
         },
         "data_description": {
-          "connection_mode": "Per meting: Home Assistant verbreekt de verbinding na elke meting, zodat de telefoon app er tussendoor kan verbinden. Daardoor moet er bij elke meting opnieuw verbinding worden gemaakt. Verbonden houden: updates komen sneller binnen, maar de sous vide stick accepteert maar één Bluetooth verbinding. Zolang Home Assistant de verbinding vasthoudt, kan de telefoon app niet verbinden.",
+          "connection_mode": "Verbonden houden (standaard): Home Assistant houdt de verbinding vast, zodat updates snel en betrouwbaar binnenkomen. De sous vide stick accepteert maar één Bluetooth verbinding, dus een telefoon app kan niet verbinden zolang Home Assistant de verbinding vasthoudt. Per meting: Home Assistant verbreekt de verbinding na elke meting, zodat een andere app er tussendoor kan verbinden. Daardoor moet er bij elke meting opnieuw verbinding worden gemaakt, en dat mislukt vaker bij een zwak signaal.",
           "poll_interval": "Hoe vaak Home Assistant de sous vide stick uitleest, in seconden (5 tot 300). Een kort interval kost meer Bluetooth verkeer. Zolang de sous vide stick niet bereikbaar is, wacht Home Assistant langer tussen de metingen."
         },
         "description": "Kies hoe Home Assistant met de sous vide stick communiceert. De sous vide stick accepteert maar één Bluetooth verbinding tegelijk."
@@ -119,8 +119,8 @@
   "selector": {
     "connection_mode": {
       "options": {
-        "per_poll": "Per meting (telefoon app kan tussen metingen verbinden)",
-        "persistent": "Verbonden houden (blokkeert de telefoon app)"
+        "persistent": "Verbonden houden (aanbevolen)",
+        "per_poll": "Per meting (een andere app kan tussen metingen verbinden)"
       }
     }
   },

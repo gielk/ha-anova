@@ -23,6 +23,7 @@ from .const import (
     DOMAIN,
     FAILURES_BEFORE_OFFLINE,
     MAX_BACKOFF_INTERVAL,
+    MAX_BACKOFF_INTERVAL_VISIBLE,
     REFRESH_COOLDOWN,
 )
 from .protocol import (
@@ -56,7 +57,8 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState | None]):
     as offline, ``online`` turns False. Entities read ``online`` to show the
     status and to disable their controls. While polls fail the interval grows
     up to ``MAX_BACKOFF_INTERVAL``; an advertisement from the cooker brings
-    the next poll forward.
+    the next poll forward. While Bluetooth still sees the cooker the interval
+    only grows up to ``MAX_BACKOFF_INTERVAL_VISIBLE``.
     """
 
     config_entry: AnovaConfigEntry
@@ -154,8 +156,11 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState | None]):
         try:
             state = await self.client.read_state()
         except AnovaError as err:
+            # Bluetooth sees the cooker, so keep trying fairly often.
             return self._async_poll_failed(
-                str(err), offline=self._failures + 1 >= FAILURES_BEFORE_OFFLINE
+                str(err),
+                offline=self._failures + 1 >= FAILURES_BEFORE_OFFLINE,
+                max_backoff=MAX_BACKOFF_INTERVAL_VISIBLE,
             )
         if self._failures:
             _LOGGER.debug("Poll succeeded after %s failed polls", self._failures)
@@ -169,7 +174,9 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState | None]):
         return state
 
     @callback
-    def _async_poll_failed(self, reason: str, *, offline: bool) -> AnovaState | None:
+    def _async_poll_failed(
+        self, reason: str, *, offline: bool, max_backoff: int = MAX_BACKOFF_INTERVAL
+    ) -> AnovaState | None:
         """Count a failed poll, back off, and return the last (frozen) data.
 
         Failed polls are normal for a cooker that is switched off, so they
@@ -180,7 +187,8 @@ class AnovaCoordinator(DataUpdateCoordinator[AnovaState | None]):
         backoff = min(
             # Cap the exponent: a cooker unplugged for days must not overflow.
             self.poll_interval.total_seconds() * 2 ** min(self._failures, 10),
-            MAX_BACKOFF_INTERVAL,
+            # Never below the poll interval the user chose.
+            max(max_backoff, self.poll_interval.total_seconds()),
         )
         self.update_interval = timedelta(seconds=backoff)
         _LOGGER.debug(

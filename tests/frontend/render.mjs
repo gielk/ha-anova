@@ -105,7 +105,7 @@ console.log("\n[1] registration, config validation, stub config");
     ["anova-cooker-card", "Anova Cooker Card", true, "https://github.com/gielk/ha-anova"]);
   check("customCards entry has a description", typeof c0.description === "string" && c0.description.length > 10);
   const banner = infoLogs.filter((t) => t.includes("ANOVA-COOKER-CARD"));
-  check("one console.info line with the version", banner.length === 1 && banner[0].includes("0.1.0"), JSON.stringify(banner));
+  check("one console.info line with the version", banner.length === 1 && banner[0].includes("0.2.0"), JSON.stringify(banner));
 
   await page.addScriptTag({ path: CARD_FILE }); // load the card a second time
   eq("double loading keeps one customCards entry", await page.evaluate(() => window.customCards.length), 1);

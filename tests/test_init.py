@@ -100,7 +100,7 @@ async def test_device_info_failure_is_not_fatal(
 @pytest.mark.parametrize(
     ("options", "disconnect_delay"),
     [
-        ({}, 2.0),
+        ({}, None),
         ({CONF_CONNECTION_MODE: "per_poll"}, 2.0),
         ({CONF_CONNECTION_MODE: "persistent"}, None),
     ],

@@ -25,6 +25,7 @@ from custom_components.anova_ble.const import (
     DEFAULT_POLL_INTERVAL,
     FAILURES_BEFORE_OFFLINE,
     MAX_BACKOFF_INTERVAL,
+    MAX_BACKOFF_INTERVAL_VISIBLE,
 )
 from custom_components.anova_ble.coordinator import AnovaCoordinator
 from custom_components.anova_ble.protocol import (
@@ -181,9 +182,28 @@ async def test_backoff_grows_and_is_capped(
     init_integration: MockConfigEntry,
     mock_client: MagicMock,
 ) -> None:
-    """While polls fail the interval doubles, up to the cap."""
+    """While Bluetooth sees the cooker the interval doubles up to a low cap."""
     coordinator = get_coordinator(init_integration)
     mock_client.read_state.side_effect = AnovaConnectionError("link dropped")
+
+    intervals = []
+    for _ in range(5):
+        await poll(hass, freezer, coordinator)
+        intervals.append(coordinator.update_interval.total_seconds())
+
+    assert intervals == [30, 60, 60, 60, 60]
+    assert max(intervals) == MAX_BACKOFF_INTERVAL_VISIBLE
+
+
+async def test_backoff_out_of_range_grows_to_the_long_cap(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    init_integration: MockConfigEntry,
+    mock_ble_device: MagicMock,
+) -> None:
+    """A cooker that Bluetooth cannot see is polled less and less often."""
+    coordinator = get_coordinator(init_integration)
+    mock_ble_device.return_value = None
 
     intervals = []
     for _ in range(7):
@@ -192,6 +212,22 @@ async def test_backoff_grows_and_is_capped(
 
     assert intervals == [30, 60, 120, 240, 300, 300, 300]
     assert max(intervals) == MAX_BACKOFF_INTERVAL
+
+
+async def test_backoff_never_below_poll_interval(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+) -> None:
+    """A long poll interval is not shortened by the low cap."""
+    coordinator = get_coordinator(init_integration)
+    coordinator.poll_interval = timedelta(seconds=120)
+    mock_client.read_state.side_effect = AnovaConnectionError("link dropped")
+
+    await poll(hass, freezer, coordinator)
+
+    assert coordinator.update_interval.total_seconds() == 120
 
 
 async def test_backoff_survives_days_offline(
@@ -209,7 +245,7 @@ async def test_backoff_survives_days_offline(
 
     assert coordinator.last_update_success
     assert not coordinator.online
-    assert coordinator.update_interval.total_seconds() == MAX_BACKOFF_INTERVAL
+    assert coordinator.update_interval.total_seconds() == MAX_BACKOFF_INTERVAL_VISIBLE
 
 
 async def test_recovery_resets_backoff(

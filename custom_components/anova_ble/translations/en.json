@@ -3,17 +3,17 @@
     "abort": {
       "already_configured": "This cooker is already set up.",
       "already_in_progress": "Setup of this cooker is already in progress.",
-      "no_devices_found": "No Anova cookers found. Make sure the cooker is plugged in and in range of a Bluetooth adapter or proxy, and close the Anova app on your phone.",
+      "no_devices_found": "No Anova cookers found. Make sure the cooker is plugged in and in range of a Bluetooth adapter or proxy, and close any other app that is connected to the cooker.",
       "not_supported": "This device is not a supported Anova Precision Cooker."
     },
     "error": {
-      "cannot_connect": "Could not connect to the cooker. Close the Anova app on your phone, move the cooker closer to the Bluetooth adapter or proxy, and try again.",
+      "cannot_connect": "Could not connect to the cooker. Close any other app that is connected to the cooker, move the cooker closer to the Bluetooth adapter or proxy, and try again.",
       "unknown": "Unexpected error. Check the logs for details."
     },
     "flow_title": "{name}",
     "step": {
       "bluetooth_confirm": {
-        "description": "Do you want to set up {name}? Close the Anova app on your phone first. The cooker accepts only one Bluetooth connection."
+        "description": "Do you want to set up {name}? First close any other app that is connected to the cooker. The cooker accepts only one Bluetooth connection."
       },
       "user": {
         "data": {
@@ -22,7 +22,7 @@
         "data_description": {
           "address": "The Anova cookers found by Bluetooth."
         },
-        "description": "Choose the cooker to set up. Close the Anova app on your phone first. The cooker accepts only one Bluetooth connection."
+        "description": "Choose the cooker to set up. First close any other app that is connected to the cooker. The cooker accepts only one Bluetooth connection."
       }
     }
   },
@@ -109,7 +109,7 @@
           "poll_interval": "Poll interval"
         },
         "data_description": {
-          "connection_mode": "Per poll: Home Assistant disconnects after each poll, so the phone app can connect in between. This costs a reconnect for every poll. Keep connected: updates are faster, but the cooker accepts only one Bluetooth connection, so the phone app cannot connect while Home Assistant holds it.",
+          "connection_mode": "Keep connected (default): Home Assistant holds the connection, so updates are fast and reliable. The cooker accepts only one Bluetooth connection, so a phone app cannot connect while Home Assistant holds it. Per poll: Home Assistant disconnects after each poll, so another app can connect in between. This costs a reconnect for every poll, which fails more often on a weak signal.",
           "poll_interval": "How often Home Assistant reads the cooker, in seconds (5 to 300). A short interval uses more Bluetooth traffic. While the cooker cannot be reached, Home Assistant waits longer between polls."
         },
         "description": "Choose how Home Assistant talks to the cooker. The cooker accepts only one Bluetooth connection at a time."
@@ -119,8 +119,8 @@
   "selector": {
     "connection_mode": {
       "options": {
-        "per_poll": "Per poll (phone app can connect between polls)",
-        "persistent": "Keep connected (blocks the phone app)"
+        "persistent": "Keep connected (recommended)",
+        "per_poll": "Per poll (another app can connect between polls)"
       }
     }
   },

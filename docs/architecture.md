@@ -16,6 +16,7 @@ custom_components/anova_ble/
   climate.py sensor.py binary_sensor.py number.py button.py select.py
   diagnostics.py
   services.yaml strings.json icons.json translations/en.json translations/nl.json
+  brand/               icon.png and icon@2x.png, an original icon (not the Anova logo)
   frontend/__init__.py  registers the card (static path + extra JS URL)
   frontend/anova-cooker-card.js
   protocol/            HA free BLE client (see docs/protocol.md)
@@ -71,13 +72,15 @@ itself, callers do not need a lock.
 | Key | Values | Default |
 | --- | --- | --- |
 | `poll_interval` | seconds, 5 to 300 | 15 |
-| `connection_mode` | `per_poll`, `persistent` | `per_poll` |
+| `connection_mode` | `persistent`, `per_poll` | `persistent` |
 
+`persistent` (default since 0.2.0): `AnovaClient(disconnect_delay=None)`.
+Faster and fewer reconnects, but the cooker accepts only one BLE connection,
+so no other app can connect while Home Assistant holds it. Anova ended app
+support for these cookers, so this is the better default.
 `per_poll`: `AnovaClient(disconnect_delay=2.0)`. The link closes right after
-each poll, so other apps can connect in between. Costs a reconnect per poll.
-`persistent`: `AnovaClient(disconnect_delay=None)`. Faster and fewer
-reconnects, but the cooker accepts only one BLE connection, so the phone app
-cannot connect while Home Assistant holds it.
+each poll, so another app can connect in between. Costs a reconnect per poll,
+which fails more often on a weak signal.
 
 ## Coordinator rules
 
@@ -97,8 +100,12 @@ never an error: setup never fails on it and nothing is logged above INFO.
 * Going offline and coming back are logged once each at INFO. Single failed
   polls only at DEBUG.
 * Backoff: while failing, `update_interval = min(poll_interval * 2**failures,
-  MAX_BACKOFF_INTERVAL)`. Reset to `poll_interval` on success. The first
-  advertisement after an out of range poll triggers a poll at once.
+  cap)`. The cap is `MAX_BACKOFF_INTERVAL` (300 s) when Bluetooth cannot see
+  the cooker, and `MAX_BACKOFF_INTERVAL_VISIBLE` (60 s) when it is seen but
+  connecting or a command fails, because then no advertisement brings the
+  next poll forward. The cap is never below `poll_interval`. Reset to
+  `poll_interval` on success. The first advertisement after an out of range
+  poll triggers a poll at once.
 * A successful poll saves the state (delayed write, 60 s). Device info is read
   once after the first successful poll and written to the device registry.
 
